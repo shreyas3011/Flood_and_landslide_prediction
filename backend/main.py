@@ -5,7 +5,11 @@ from typing import Optional
 from backend.predictor import predict_risk, engineer_flood_features, engineer_landslide_features, \
     flood_model, landslide_model, _physics_flood_cap, _physics_landslide_cap, flood_meta, landslide_meta
 
-app = FastAPI(title="Flood & Landslide Prediction API")
+app = FastAPI(
+    title="Flood & Landslide Prediction API",
+    description="ML-powered flood and landslide risk prediction for India",
+    version="1.0.0"
+)
 
 # Allow CORS for the frontend
 app.add_middleware(
@@ -42,6 +46,10 @@ class ManualRequest(BaseModel):
 @app.get("/")
 def read_root():
     return {"status": "online", "message": "Flood & Landslide Prediction API"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "Flood prediction API is running"}
 
 @app.post("/predict")
 def predict(request: LocationRequest):
