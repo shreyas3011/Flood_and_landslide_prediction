@@ -53,9 +53,9 @@ export default function TabMapExplorer() {
   }, []);
 
   return (
-    <div className="flex gap-4 h-full min-w-0">
+    <div className="flex flex-col lg:flex-row gap-4 h-full min-w-0">
       {/* Sidebar */}
-      <div className="w-72 xl:w-80 flex-shrink-0 flex flex-col gap-3 overflow-y-auto pr-1 pb-4" style={{scrollbarWidth:'thin', scrollbarColor:'rgba(255,255,255,0.1) transparent'}}>
+      <div className="w-full lg:w-72 xl:w-80 lg:flex-shrink-0 flex flex-col gap-3 overflow-y-auto pr-1 pb-4 custom-scrollbar">
         <div className="glass p-3 rounded-2xl border border-white/5 shadow-sm flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
             <MapPin size={18} className="text-blue-400" />
@@ -115,7 +115,7 @@ export default function TabMapExplorer() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 min-w-0 glass rounded-2xl border border-white/5 overflow-hidden shadow-2xl relative min-h-[400px]">
+      <div className="flex-1 min-w-0 glass rounded-2xl border border-white/5 overflow-hidden shadow-2xl relative h-[300px] lg:h-full min-h-[300px]">
         <MapContainer center={[20.5937, 78.9629]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'

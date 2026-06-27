@@ -199,9 +199,9 @@ export default function TabDualMaps() {
 
       {/* Dual Maps Grid */}
       {(fetched || clickPoints.length > 0) && !loadingAll && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[500px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
           {/* Flood Map */}
-          <div className="relative glass-card-blue rounded-[2rem] border border-blue-500/20 overflow-hidden shadow-[0_10px_40px_rgba(59,130,246,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(59,130,246,0.25)]">
+          <div className="relative glass-card-blue rounded-[2rem] border border-blue-500/20 overflow-hidden shadow-[0_10px_40px_rgba(59,130,246,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(59,130,246,0.25)] h-[350px] lg:h-full">
             <MapContainer center={[22, 82]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
               <TileLayer
                 attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -244,7 +244,7 @@ export default function TabDualMaps() {
           </div>
 
           {/* Landslide Map */}
-          <div className="relative glass-card-amber rounded-[2rem] border border-amber-500/20 overflow-hidden shadow-[0_10px_40px_rgba(245,158,11,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(245,158,11,0.25)]">
+          <div className="relative glass-card-amber rounded-[2rem] border border-amber-500/20 overflow-hidden shadow-[0_10px_40px_rgba(245,158,11,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(245,158,11,0.25)] h-[350px] lg:h-full">
             <MapContainer center={[22, 82]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
               <TileLayer
                 attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -289,12 +289,12 @@ export default function TabDualMaps() {
       )}
 
       {lastClick?.prediction && (
-        <div className="glass px-5 py-3 rounded-xl border border-white/10 flex flex-wrap items-center gap-4 shadow-lg shrink-0 animate-in slide-in-from-bottom-4 duration-300">
+        <div className="glass px-4 py-3 rounded-xl border border-white/10 flex flex-col sm:flex-row sm:items-center gap-3 shadow-lg shrink-0 animate-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
             <MapPin size={16} className="text-indigo-400" />
             {lastClick.label}
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <Droplets size={14} className="text-blue-400" />
               <span className="text-xs font-semibold text-blue-300">Flood: <span className="font-bold text-blue-400">{lastClick.prediction.predictions.flood_risk_pct}%</span></span>
