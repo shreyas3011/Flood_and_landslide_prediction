@@ -8,7 +8,7 @@ import { SAFE_ZONES } from '../../data/safeZones';
 import { makeSafeZoneIcon, fmtDist, fmtTime, ZONE_META } from '../../utils/mapUtils';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://flood-and-landslide-prediction.onrender.com';
 
 async function fetchPrediction(lat, lon) {
   const response = await axios.post(`${API_BASE}/predict`, { lat, lon });

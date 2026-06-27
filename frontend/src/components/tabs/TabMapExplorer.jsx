@@ -8,7 +8,7 @@ import { makeSafeZoneIcon, fmtDist, fmtTime } from '../../utils/mapUtils';
 import PredictionResult from '../ui/PredictionResult';
 import NearestSafeZonesPanel from '../ui/NearestSafeZonesPanel';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://flood-and-landslide-prediction.onrender.com';
 
 async function fetchPrediction(lat, lon) {
   const response = await axios.post(`${API_BASE}/predict`, { lat, lon });
