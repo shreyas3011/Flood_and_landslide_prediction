@@ -1,0 +1,12 @@
+Feature,Landslide_Mean,NoLandslide_Mean,Diff,r,p_value,Sig
+rainfall_mm,10.036,3.251,6.784,0.2167,0.0,✓
+antecedent_7day_mm,101.328,8.767,92.561,0.5822,0.0,✓
+temp_max_c,23.018,27.583,-4.565,-0.1864,0.0,✓
+temp_min_c,16.313,16.742,-0.428,-0.0178,0.068855,✗
+humidity_pct,94.187,76.489,17.698,0.2805,0.0,✓
+wind_speed_kmh,12.049,17.314,-5.265,-0.2604,0.0,✓
+precipitation_hours,10.237,3.383,6.855,0.3889,0.0,✓
+evapotranspiration_mm,3.178,4.752,-1.575,-0.2669,0.0,✓
+soil_moisture,0.391,0.211,0.179,0.4237,0.0,✓
+elevation_m,1156.172,568.947,587.225,0.2575,0.0,✓
+river_discharge_m3s,78.741,299.606,-220.865,-0.0438,1.3e-05,✓
