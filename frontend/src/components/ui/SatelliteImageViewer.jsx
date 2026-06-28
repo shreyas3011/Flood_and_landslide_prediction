@@ -261,7 +261,7 @@ export default function SatelliteImageViewer({ lat, lon, locationName }) {
             <div>
               <h3 className="text-sm font-bold text-slate-200">Live Satellite Analysis</h3>
               <p className="text-[10px] text-slate-500">
-                Sentinel-2 ESA · {imageMode === 'mostRecent' ? 'Most recent (last 15 days)' : 'Clearest (last 90 days)'}
+                Sentinel-2 ESA
               </p>
             </div>
           </div>
