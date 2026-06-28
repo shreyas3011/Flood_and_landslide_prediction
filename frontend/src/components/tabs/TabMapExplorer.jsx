@@ -7,6 +7,7 @@ import { SAFE_ZONES } from '../../data/safeZones';
 import { makeSafeZoneIcon, fmtDist, fmtTime } from '../../utils/mapUtils';
 import PredictionResult from '../ui/PredictionResult';
 import NearestSafeZonesPanel from '../ui/NearestSafeZonesPanel';
+import { useSettings } from '../../context/SettingsContext';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://127.0.0.1:8000'
@@ -28,6 +29,7 @@ function LocationMarker({ position, setPosition, onLocationSelect }) {
 }
 
 export default function TabMapExplorer() {
+  const { theme, t } = useSettings();
   const [position, setPosition] = useState(null);
   const [loading, setLoading] = useState(false);
   const [prediction, setPrediction] = useState(null);
@@ -58,20 +60,20 @@ export default function TabMapExplorer() {
     <div className="flex flex-col lg:flex-row gap-4 h-full w-full flex-1 min-w-0">
       {/* Sidebar */}
       <div className="w-full lg:w-72 xl:w-80 lg:flex-shrink-0 flex flex-col gap-3 overflow-y-auto pr-1 pb-4 custom-scrollbar">
-        <div className="glass p-3 rounded-2xl border border-white/5 shadow-sm flex items-center gap-3">
+        <div className="glass p-3 rounded-2xl border border-slate-200/10 dark:border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-            <MapPin size={18} className="text-blue-400" />
+            <MapPin size={18} className="text-blue-500" />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Selected Coordinates</div>
-            <div className="text-sm font-semibold text-slate-200">
-              {position ? `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}` : 'Click anywhere on the map'}
+            <div className="text-[10px] font-bold text-slate-700 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-0.5">{t('selectedCoords')}</div>
+            <div className="text-sm font-semibold text-slate-800 dark:text-slate-800 dark:text-slate-200">
+              {position ? `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}` : t('clickMapHint')}
             </div>
           </div>
         </div>
 
-        <div className="glass p-4 rounded-2xl border border-white/5 shadow-sm">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Historical Case Studies</div>
+        <div className="glass p-4 rounded-2xl border border-slate-200/10 dark:border-slate-200 dark:border-white/5 shadow-sm">
+          <div className="text-[10px] font-bold text-slate-700 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-3">{t('historicalCaseStudies')}</div>
           <div className="flex flex-col gap-2">
             {[
               { name: 'Kedarnath, Himalayas', desc: 'Extreme Landslide Risk Zone', lat: 30.74, lon: 79.07 },
@@ -81,27 +83,27 @@ export default function TabMapExplorer() {
             ].map(loc => (
               <button
                 key={loc.name}
-                className="flex flex-col items-start p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all text-left group"
+                className="flex flex-col items-start p-3 rounded-xl bg-slate-100/50 hover:bg-slate-200/50 dark:bg-slate-100 dark:bg-white/5 dark:hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200/10 dark:border-slate-200 dark:border-white/5 hover:border-slate-300/30 dark:hover:border-slate-300 dark:hover:border-white/20 transition-all text-left group"
                 onClick={() => { setPosition({ lat: loc.lat, lng: loc.lon }); handleLocationSelect(loc.lat, loc.lon); }}
               >
-                <div className="text-xs font-semibold text-slate-200 group-hover:text-blue-300 transition-colors">{loc.name}</div>
-                <div className="text-[10px] text-slate-400">{loc.desc}</div>
+                <div className="text-xs font-semibold text-slate-800 dark:text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">{loc.name}</div>
+                <div className="text-[10px] text-slate-700 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">{loc.desc}</div>
               </button>
             ))}
           </div>
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium">
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-medium">
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="glass p-8 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center">
+          <div className="glass p-8 rounded-2xl border border-slate-200/10 dark:border-slate-200 dark:border-white/5 flex flex-col items-center justify-center text-center">
             <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-4" />
-            <div className="text-sm font-medium text-slate-300">Analyzing satellite telemetry...</div>
-            <div className="text-[10px] text-slate-500 mt-1">Running ML pipelines</div>
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-700 dark:text-slate-300">{t('analyzingTelemetry')}</div>
+            <div className="text-[10px] text-slate-700 dark:text-slate-400 mt-1">{t('runningPipelines')}</div>
           </div>
         ) : prediction ? (
           <>
@@ -109,19 +111,22 @@ export default function TabMapExplorer() {
             <NearestSafeZonesPanel zones={nearestZones} loading={zonesLoading} />
           </>
         ) : (
-          <div className="glass p-10 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center opacity-60">
-            <MapPin size={32} className="text-slate-500 mb-3" />
-            <p className="text-sm font-medium text-slate-400">Select a location on the map to run the AI prediction models.</p>
+          <div className="glass p-10 rounded-2xl border border-slate-200/10 dark:border-slate-200 dark:border-white/5 flex flex-col items-center justify-center text-center opacity-60">
+            <MapPin size={32} className="text-slate-600 dark:text-slate-400 mb-3" />
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">{t('selectLocationPrompt')}</p>
           </div>
         )}
       </div>
 
       {/* Map */}
-      <div className="flex-1 min-w-0 glass rounded-2xl border border-white/5 overflow-hidden shadow-2xl relative min-h-[350px] flex flex-col w-full">
+      <div className="flex-1 min-w-0 glass rounded-2xl border border-slate-200/10 dark:border-slate-200 dark:border-white/5 overflow-hidden shadow-2xl relative min-h-[350px] flex flex-col w-full">
         <MapContainer center={[20.5937, 78.9629]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            url={theme === 'dark' 
+              ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" 
+              : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            }
           />
           <LocationMarker position={position} setPosition={setPosition} onLocationSelect={handleLocationSelect} />
           
@@ -135,14 +140,14 @@ export default function TabMapExplorer() {
             >
               <Popup className="premium-popup">
                 <div className="font-sans text-xs min-w-[160px]">
-                  {i === 0 && <div className="text-emerald-500 font-bold text-[10px] mb-1 uppercase tracking-wider">⭐ Nearest Safe Zone</div>}
-                  <strong className="text-sm block">{item.zone.name}</strong>
-                  <span className="text-[10px] text-slate-500 capitalize block mt-0.5">
+                  {i === 0 && <div className="text-emerald-600 dark:text-emerald-500 font-bold text-[10px] mb-1 uppercase tracking-wider">⭐ {t('nearestSafeZoneMapTitle')}</div>}
+                  <strong className="text-sm block text-slate-800 dark:text-slate-800 dark:text-slate-200">{item.zone.name}</strong>
+                  <span className="text-[10px] text-slate-700 dark:text-slate-400 capitalize block mt-0.5">
                     {item.zone.type.replace('_', ' ')} · {item.zone.state}
                   </span>
-                  <div className="flex gap-2 mt-2 pt-2 border-t border-slate-200">
-                    <span className="font-bold text-indigo-600">📍 {fmtDist(item.distanceM)}</span>
-                    <span className="font-bold text-indigo-600">🕒 {fmtTime(item.durationSec)}</span>
+                  <div className="flex gap-2 mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">📍 {fmtDist(item.distanceM)}</span>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">🕒 {fmtTime(item.durationSec)}</span>
                   </div>
                 </div>
               </Popup>

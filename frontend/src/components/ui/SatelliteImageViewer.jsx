@@ -165,15 +165,12 @@ function SingleImageCard({ config, lat, lon, riverInfo, onExpand, mosaickingOrde
                 <MapPin size={10} /> {riverInfo.name}
               </div>
             )}
-            {/* Corner badge for date & cloud cover */}
-            {imageMeta?.date && (
+            {/* Corner badge for cloud cover */}
+            {imageMeta?.cloudCover !== null && imageMeta?.cloudCover !== undefined && (
               <div className="absolute top-2 right-2 bg-slate-900/85 backdrop-blur text-slate-200 text-[10px] px-2 py-0.5 rounded-md font-semibold flex flex-col items-end shadow-md">
-                <span>📅 {imageMeta.date.split('T')[0]}</span>
-                {imageMeta.cloudCover !== null && (
-                  <span className="text-[8px] text-slate-400 leading-tight">
-                    ☁️ {Math.round(imageMeta.cloudCover)}% clouds
-                  </span>
-                )}
+                <span className="text-[8px] text-slate-400 leading-tight">
+                  ☁️ {Math.round(imageMeta.cloudCover)}% clouds
+                </span>
               </div>
             )}
           </>

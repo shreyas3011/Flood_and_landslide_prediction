@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useSettings } from '../context/SettingsContext';
 import {
   MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents, Polyline,
 } from 'react-leaflet';
@@ -62,16 +63,16 @@ if (!document.getElementById('nf-styles')) {
     }
     .nf-gmap-btn:hover { background: rgba(66,133,244,0.28); color: #bfdbfe; }
     .nf-search-input {
-      flex: 1; background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(148,163,184,0.2);
+      flex: 1; background: var(--bg-app);
+      border: 1px solid var(--border-color);
       border-radius: 10px; padding: 10px 14px;
-      color: #e2e8f0; font-size: 13px; font-family: inherit;
+      color: var(--text-main); font-size: 13px; font-family: inherit;
       outline: none; transition: border 0.2s, background 0.2s;
     }
-    .nf-search-input::placeholder { color: #475569; }
+    .nf-search-input::placeholder { color: var(--text-dim); }
     .nf-search-input:focus {
-      border-color: rgba(99,102,241,0.55);
-      background: rgba(99,102,241,0.06);
+      border-color: var(--accent-blue-text);
+      background: var(--bg-card);
     }
     .nf-btn-primary {
       padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer;
@@ -84,16 +85,19 @@ if (!document.getElementById('nf-styles')) {
     .nf-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
     .nf-chip {
       padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 600;
-      border: 1px solid rgba(99,102,241,0.3); background: rgba(99,102,241,0.08);
-      color: #a5b4fc; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+      border: 1px solid var(--accent-blue-border); background: var(--accent-blue-bg);
+      color: var(--accent-blue-text); cursor: pointer; transition: all 0.15s; white-space: nowrap;
       font-family: inherit;
     }
-    .nf-chip:hover:not(:disabled) { background: rgba(99,102,241,0.18); color: #c7d2fe; }
+    .nf-chip:hover:not(:disabled) { background: var(--border-color); color: var(--text-main); }
     .nf-chip:disabled { opacity: 0.5; cursor: not-allowed; }
     .nf-radius-select {
-      background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.2);
-      border-radius: 8px; padding: 6px 10px; color: #e2e8f0; font-size: 12px;
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 8px; padding: 6px 10px; color: var(--text-main); font-size: 12px;
       font-family: inherit; outline: none; cursor: pointer;
+    }
+    .nf-radius-select option {
+      background: var(--bg-card); color: var(--text-main);
     }
     .nf-type-chip {
       padding: 3px 9px; border-radius: 12px; font-size: 10px; font-weight: 700;
@@ -245,6 +249,7 @@ function detectType(tags) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function NearbyFacilities() {
+  const { theme, t } = useSettings();
   const [userPos,      setUserPos]      = useState(null);     // { lat, lon, label }
   const [results,      setResults]      = useState([]);
   const [status,       setStatus]       = useState('idle');   // idle|loading|done|error
@@ -327,7 +332,7 @@ export default function NearbyFacilities() {
               title: nearestHosp.type === 'hospital' ? 'Nearest Hospital' : 'Nearest Clinic',
               facility: nearestHosp,
               route,
-              color: '#10b981'
+              color: theme === 'light' ? '#047857' : '#10b981'
             }))
           );
         }
@@ -354,7 +359,7 @@ export default function NearbyFacilities() {
       setErrorMsg(err.message || 'Search failed.');
       setStatus('error');
     }
-  }, [radiusKm, activeTypes]);
+  }, [radiusKm, activeTypes, theme]);
 
   // ── GPS ──────────────────────────────────────────────────────
   const handleGPS = useCallback(() => {
@@ -483,7 +488,18 @@ export default function NearbyFacilities() {
   const isLoading = gpsLoading || searchLoading || status === 'loading';
 
   // ── Design tokens ────────────────────────────────────────────
-  const C = {
+  const C = theme === 'light' ? {
+    bg:          '#f1f5f9',
+    surface:     '#ffffff',
+    surfaceAlt:  '#f8fafc',
+    border:      'rgba(99,102,241,0.15)',
+    borderLight: 'rgba(0,0,0,0.08)',
+    accent:      '#4f46e5',
+    accentGlow:  'rgba(99,102,241,0.1)',
+    text:        '#0f172a',
+    textMuted:   '#475569',
+    textFaint:   '#94a3b8',
+  } : {
     bg:          '#0f172a',
     surface:     '#1e293b',
     surfaceAlt:  '#162032',
@@ -518,7 +534,7 @@ export default function NearbyFacilities() {
           padding: '6px 18px', fontSize: '11px', color: C.textMuted, pointerEvents: 'none',
           whiteSpace: 'nowrap',
         }}>
-          {status === 'loading' ? '🔍 Searching for facilities…' : '📍 Use sidebar to search a location'}
+          {status === 'loading' ? 'Searching for facilities...' : t('clickMapRoutingHint')}
         </div>
 
         <MapContainer
@@ -526,7 +542,7 @@ export default function NearbyFacilities() {
           style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}
         >
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            url={theme === 'dark' ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"}
             attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
           {flyTarget && <MapFlyTo position={flyTarget} zoom={radiusKm <= 5 ? 14 : radiusKm <= 15 ? 13 : 11} />}
@@ -537,7 +553,7 @@ export default function NearbyFacilities() {
             <Marker position={[userPos.lat, userPos.lon]} icon={USER_ICON} zIndexOffset={2000}>
               <Popup>
                 <div style={{ fontFamily: 'Inter,sans-serif', fontSize: '13px' }}>
-                  <strong>📍 Your Location</strong><br />
+                  <strong>{t('yourLocationMarker')}</strong><br />
                   <span style={{ fontSize: '11px', color: '#64748b' }}>{userPos.label}</span>
                 </div>
               </Popup>
@@ -795,7 +811,7 @@ export default function NearbyFacilities() {
                   style={{
                     background:   active ? t.color + '20' : 'transparent',
                     borderColor:  active ? t.color + '60' : C.borderLight,
-                    color:        active ? t.color        : C.textFaint,
+                    color:        active ? t.color        : C.textMuted,
                   }}
                 >
                   {t.emoji} {t.label}
@@ -819,7 +835,7 @@ export default function NearbyFacilities() {
               <div style={{
                 marginTop: '12px', padding: '7px 10px', borderRadius: '8px',
                 background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
-                fontSize: '11px', color: '#fcd34d',
+                fontSize: '11px', color: theme === 'light' ? '#92400e' : '#fcd34d',
               }}>📍 {userPos.label}</div>
             )}
           </div>
@@ -850,11 +866,11 @@ export default function NearbyFacilities() {
               ...card, padding: '10px 14px',
               background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)',
             }} className="nf-card">
-              <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#fbbf24', marginBottom: '2px' }}>
+              <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: theme === 'light' ? '#b45309' : '#fbbf24', marginBottom: '2px' }}>
                 Searching Near
               </div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#fde68a' }}>{userPos?.label}</div>
-              <div style={{ fontSize: '10px', color: '#fcd34d', marginTop: '2px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: theme === 'light' ? '#78350f' : '#fde68a' }}>{userPos?.label}</div>
+              <div style={{ fontSize: '10px', color: theme === 'light' ? '#92400e' : '#fcd34d', marginTop: '2px' }}>
                 {userPos?.lat.toFixed(4)}°N, {userPos?.lon.toFixed(4)}°E · {radiusKm} km radius
               </div>
             </div>
@@ -867,11 +883,11 @@ export default function NearbyFacilities() {
                 <div style={{ fontSize: '10px', color: C.textMuted }}>Finding safest path to nearest Hospital & Police station</div>
               </div>
             ) : evacRoutes.length > 0 ? (
-              <div style={{ ...card, padding: '14px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px solid rgba(16, 185, 129, 0.3)' }} className="nf-card">
+              <div style={{ ...card, padding: '14px', background: theme === 'light' ? 'linear-gradient(135deg, #f8fafc, #e2e8f0)' : 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px solid rgba(16, 185, 129, 0.3)' }} className="nf-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                   <span style={{ fontSize: '22px' }}>🚨</span>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#10b981' }}>Evacuation Navigation</div>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: theme === 'light' ? '#047857' : '#10b981' }}>Evacuation Navigation</div>
                     <div style={{ fontSize: '10px', color: C.textMuted }}>Safest emergency routes plotted on map</div>
                   </div>
                 </div>
@@ -883,7 +899,7 @@ export default function NearbyFacilities() {
                       style={{
                         padding: '12px',
                         borderRadius: '12px',
-                        background: 'rgba(255,255,255,0.04)',
+                        background: theme === 'light' ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.04)',
                         border: `1px solid ${er.color}44`,
                         borderLeft: `4px solid ${er.color}`,
                         cursor: 'pointer',
@@ -898,7 +914,7 @@ export default function NearbyFacilities() {
                         <span style={{ fontSize: '11px', fontWeight: 700, color: er.color }}>
                           {er.facility.typeMeta.emoji} {er.title}
                         </span>
-                        <span style={{ fontSize: '11px', fontWeight: 800, color: '#e2e8f0', background: `${er.color}22`, padding: '2px 8px', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-main)', background: `${er.color}22`, padding: '2px 8px', borderRadius: '12px' }}>
                           {er.route.durationSec ? `${Math.ceil(er.route.durationSec / 60)} mins` : 'Direct'}
                         </span>
                       </div>

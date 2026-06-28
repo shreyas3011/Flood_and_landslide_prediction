@@ -4,9 +4,12 @@ import './App.css'
 import './index.css'
 import 'leaflet/dist/leaflet.css'
 import App from './App.jsx'
+import { SettingsProvider } from './context/SettingsContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <SettingsProvider>
+      <App />
+    </SettingsProvider>
   </StrictMode>,
 )

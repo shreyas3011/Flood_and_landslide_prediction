@@ -12,10 +12,10 @@ const TABS = [
 
 export default function AppShell({ activeTab, setActiveTab, children }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col">
+    <div className="min-h-screen bg-transparent text-slate-800 dark:text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col transition-colors duration-200">
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-900/20 blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-900/10 blur-[120px]" />
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-950/10 dark:bg-blue-900/20 blur-[120px] dark:block hidden" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-950/5 dark:bg-emerald-900/10 blur-[120px] dark:block hidden" />
       </div>
       
       <TopNav activeTab={activeTab} setActiveTab={setActiveTab} tabs={TABS} />

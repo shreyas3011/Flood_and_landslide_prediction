@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useSettings } from '../context/SettingsContext';
 import {
   MapContainer, TileLayer, Marker, Polyline,
   Popup, Tooltip, useMapEvents, useMap,
@@ -55,18 +56,18 @@ if (!document.getElementById('evac-map-style')) {
     .evac-step-row:hover { background: rgba(99,102,241,0.06); border-radius: 6px; }
     .evac-preset-chip {
       padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
-      border: 1px solid rgba(99,102,241,0.3); background: rgba(99,102,241,0.1);
-      color: #a5b4fc; cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
+      border: 1px solid var(--accent-blue-border); background: var(--accent-blue-bg);
+      color: var(--accent-blue-text); cursor: pointer; transition: all 0.15s ease; white-space: nowrap;
       font-family: inherit;
     }
-    .evac-preset-chip:hover { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.5); color: #c7d2fe; }
+    .evac-preset-chip:hover { background: var(--border-color); color: var(--text-main); }
     .evac-loc-input {
-      flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(148,163,184,0.2);
-      border-radius: 8px; padding: 8px 10px; color: #e2e8f0; font-size: 12px;
+      flex: 1; background: var(--bg-app); border: 1px solid var(--border-color);
+      border-radius: 8px; padding: 8px 10px; color: var(--text-main); font-size: 12px;
       font-family: inherit; outline: none; transition: border 0.2s;
     }
-    .evac-loc-input::placeholder { color: #475569; }
-    .evac-loc-input:focus { border-color: rgba(99,102,241,0.5); background: rgba(99,102,241,0.06); }
+    .evac-loc-input::placeholder { color: var(--text-dim); }
+    .evac-loc-input:focus { border-color: var(--accent-blue-text); background: var(--bg-card); }
     .evac-gps-btn {
       width: 100%; padding: 10px 12px; border-radius: 10px; border: none; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -78,12 +79,12 @@ if (!document.getElementById('evac-map-style')) {
     .evac-gps-btn:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
     .evac-gps-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .evac-search-btn {
-      padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(99,102,241,0.4);
-      background: rgba(99,102,241,0.15); color: #a5b4fc; cursor: pointer;
+      padding: 8px 12px; border-radius: 8px; border: 1px solid var(--accent-blue-border);
+      background: var(--accent-blue-bg); color: var(--accent-blue-text); cursor: pointer;
       font-size: 12px; font-weight: 600; font-family: inherit;
       transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
     }
-    .evac-search-btn:hover:not(:disabled) { background: rgba(99,102,241,0.25); }
+    .evac-search-btn:hover:not(:disabled) { background: var(--border-color); color: var(--text-main); }
     .evac-search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   `;
   document.head.appendChild(s);
@@ -179,6 +180,7 @@ function MapFlyTo({ position }) {
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function EvacuationMap({ floodRiskPoint = null }) {
+  const { theme, t } = useSettings();
   // Route state
   const [userPoint,   setUserPoint]   = useState(null);
   const [nearestZone, setNearestZone] = useState(null);
@@ -319,7 +321,21 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
   }, []);
 
   // ── Design tokens ──────────────────────────────────────────────────────────
-  const C = {
+  const C = theme === 'light' ? {
+    surface:     '#ffffff',
+    surfaceAlt:  '#f1f5f9',
+    border:      'rgba(99,102,241,0.15)',
+    borderLight: 'rgba(0,0,0,0.08)',
+    accent:      '#4f46e5',
+    accentGlow:  'rgba(99,102,241,0.1)',
+    success:     '#059669',
+    successBg:   'rgba(5,150,105,0.1)',
+    danger:      '#dc2626',
+    amber:       '#d97706',
+    text:        '#0f172a',
+    textMuted:   '#475569',
+    textFaint:   '#94a3b8',
+  } : {
     surface:     '#1e293b',
     surfaceAlt:  '#162032',
     border:      'rgba(99,102,241,0.18)',
@@ -371,7 +387,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
 
         <MapContainer center={[22.5, 82.5]} zoom={5} style={{ height: '100%', width: '100%' }}>
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            url={theme === 'dark' ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"}
             attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
 
@@ -415,7 +431,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
             <Marker position={[userPoint.lat, userPoint.lng]} icon={ICONS.user}>
               <Popup>
                 <div style={{ fontFamily: 'Inter,sans-serif', fontSize: '13px' }}>
-                  <strong>📍 Your Location</strong><br />
+                  <strong>📍 {t('yourLocationMarker')}</strong><br />
                   <span style={{ fontSize: '11px', color: '#64748b' }}>{userPoint.label}</span><br />
                   <span style={{ fontSize: '11px', color: '#64748b' }}>
                     {userPoint.lat.toFixed(5)}°N, {userPoint.lng.toFixed(5)}°E
@@ -461,10 +477,10 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
               background: 'linear-gradient(135deg,#6366f1,#818cf8)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '18px', boxShadow: '0 4px 12px rgba(99,102,241,0.4)', flexShrink: 0,
-            }}>🚨</div>
+            }}></div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '14px', color: C.text }}>Evacuation Planner</div>
-              <div style={{ fontSize: '10px', color: C.textMuted }}>Powered by OpenRouteService API</div>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: C.text }}>{t('evacuationPlannerTitle')}</div>
+              <div style={{ fontSize: '10px', color: C.textMuted }}>{t('poweredByOrs')}</div>
             </div>
           </div>
         </div>
@@ -472,7 +488,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
         {/* ── Location Input Panel (always visible) ── */}
         <div style={{ ...card }} className="evac-sidebar-card">
           <div style={{ fontWeight: 700, fontSize: '12px', color: C.text, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '14px' }}>📍</span> Set Your Location
+            {t('setYourLocation')}
           </div>
 
           {/* GPS Button */}
@@ -483,9 +499,9 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
             style={{ marginBottom: '10px' }}
           >
             {gpsLoading ? (
-              <><div className="evac-sm-spinner" style={{ borderTopColor: '#fff' }} /> Acquiring GPS signal…</>
+              <><div className="evac-sm-spinner" style={{ borderTopColor: '#fff' }} /> {t('acquiringGpsSignal')}</>
             ) : (
-              <><span style={{ fontSize: '16px' }}>🎯</span> Use My Current Location</>
+              <><span style={{ fontSize: '16px' }}>🎯</span> {t('useCurrentLocationBtn')}</>
             )}
           </button>
 
@@ -495,7 +511,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
             marginBottom: '10px',
           }}>
             <div style={{ flex: 1, height: 1, background: C.borderLight }} />
-            <span style={{ fontSize: '10px', color: C.textFaint, fontWeight: 600, letterSpacing: '0.06em' }}>OR SEARCH</span>
+            <span style={{ fontSize: '10px', color: C.textFaint, fontWeight: 600, letterSpacing: '0.06em' }}>{t('orSearchLabel')}</span>
             <div style={{ flex: 1, height: 1, background: C.borderLight }} />
           </div>
 
@@ -505,7 +521,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
               ref={searchInputRef}
               className="evac-loc-input"
               type="text"
-              placeholder="e.g. Kedarnath, Guwahati, Patna…"
+              placeholder={t('searchPlacePlaceholder')}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
@@ -605,7 +621,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
               <div style={{
                 marginTop: '12px', padding: '7px 10px', borderRadius: '8px',
                 background: `rgba(245,158,11,0.1)`, border: '1px solid rgba(245,158,11,0.2)',
-                fontSize: '11px', color: '#fcd34d',
+                fontSize: '11px', color: theme === 'light' ? '#92400e' : '#fcd34d',
               }}>
                 📍 {userPoint.label}
               </div>
@@ -653,11 +669,11 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
                 ...card, padding: '10px 14px',
                 background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)',
               }} className="evac-sidebar-card">
-                <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#fbbf24', marginBottom: '3px' }}>
-                  Your Location
+                <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: theme === 'light' ? '#b45309' : '#fbbf24', marginBottom: '3px' }}>
+                  {t('yourLocationMarker')}
                 </div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#fde68a' }}>{userPoint.label}</div>
-                <div style={{ fontSize: '10px', color: '#fcd34d', marginTop: '2px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: theme === 'light' ? '#78350f' : '#fde68a' }}>{userPoint.label}</div>
+                <div style={{ fontSize: '10px', color: theme === 'light' ? '#92400e' : '#fcd34d', marginTop: '2px' }}>
                   {userPoint.lat.toFixed(4)}°N, {userPoint.lng.toFixed(4)}°E
                 </div>
               </div>
@@ -672,10 +688,10 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '15px', flexShrink: 0 }}>⚠️</span>
                   <div>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#fcd34d', marginBottom: '2px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: theme === 'light' ? '#92400e' : '#fcd34d', marginBottom: '2px' }}>
                       Limited Road Access Detected
                     </div>
-                    <div style={{ fontSize: '10px', color: '#fbbf24', lineHeight: 1.6 }}>
+                    <div style={{ fontSize: '10px', color: theme === 'light' ? '#b45309' : '#fbbf24', lineHeight: 1.6 }}>
                       No drivable roads found near this location (remote/mountainous area).
                       Showing <strong>straight-line distances</strong> to nearest facilities.
                       Actual travel may require different routes.
@@ -747,7 +763,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
                             )}
                           </div>
                           {isNearest && (
-                            <div style={{ fontSize: '10px', color: '#34d399', marginTop: '4px', fontWeight: 700 }}>
+                            <div style={{ fontSize: '10px', color: theme === 'light' ? '#065f46' : '#34d399', marginTop: '4px', fontWeight: 700 }}>
                               ✅ Route calculated to this facility
                             </div>
                           )}
@@ -769,10 +785,10 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '7px', marginBottom: '12px' }}>
                 <div style={{ background: C.surfaceAlt, borderRadius: '10px', padding: '11px 6px', textAlign: 'center', border: `1px solid ${C.accent}33` }}>
                   <p style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#a5b4fc' }}>{fmtDist(route.distanceM)}</p>
-                  <p style={{ margin: '3px 0 0', fontSize: '8px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Distance</p>
+                  <p style={{ margin: '3px 0 0', fontSize: '8px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('distanceLabel')}</p>
                 </div>
                 <div style={{ background: C.surfaceAlt, borderRadius: '10px', padding: '11px 6px', textAlign: 'center', border: `1px solid ${C.success}33` }}>
-                  <p style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#6ee7b7' }}>{fmtTime(route.durationSec)}</p>
+                  <p style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: theme === 'light' ? '#059669' : '#6ee7b7' }}>{fmtTime(route.durationSec)}</p>
                   <p style={{ margin: '3px 0 0', fontSize: '8px', color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {isFallback ? 'Walk est.' : 'Drive time'}
                   </p>
@@ -788,11 +804,11 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
                 background: C.successBg, border: '1px solid rgba(16,185,129,0.25)',
                 borderRadius: '10px', padding: '12px',
               }}>
-                <p style={{ margin: '0 0 2px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#34d399' }}>
+                <p style={{ margin: '0 0 2px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: theme === 'light' ? '#065f46' : '#34d399' }}>
                   Nearest Safe Zone
                 </p>
-                <p style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 700, color: '#a7f3d0' }}>{nearestZone.name}</p>
-                <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#6ee7b7', textTransform: 'capitalize' }}>
+                <p style={{ margin: '2px 0 0', fontSize: '14px', fontWeight: 700, color: theme === 'light' ? '#047857' : '#a7f3d0' }}>{nearestZone.name}</p>
+                <p style={{ margin: '3px 0 0', fontSize: '11px', color: theme === 'light' ? '#059669' : '#6ee7b7', textTransform: 'capitalize' }}>
                   {nearestZone.type.replace('_', ' ')} · {nearestZone.state}
                 </p>
               </div>
@@ -865,7 +881,7 @@ export default function EvacuationMap({ floodRiskPoint = null }) {
                   ))}
                   <div style={{
                     padding: '10px 16px', background: C.successBg,
-                    fontSize: '12px', fontWeight: 700, color: '#6ee7b7',
+                    fontSize: '12px', fontWeight: 700, color: theme === 'light' ? '#059669' : '#6ee7b7',
                     display: 'flex', alignItems: 'center', gap: '6px',
                   }}>
                     🏁 Arrive at {nearestZone.name}

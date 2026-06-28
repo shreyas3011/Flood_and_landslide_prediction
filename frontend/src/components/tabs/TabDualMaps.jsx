@@ -3,6 +3,7 @@ import { Layers, Droplets, Mountain, MapPin } from 'lucide-react';
 import axios from 'axios';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import { getRiskColor, getRiskLabel } from '../../utils/riskUtils';
+import { useSettings } from '../../context/SettingsContext';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://127.0.0.1:8000'
@@ -98,138 +99,125 @@ function MapSizeFixer() {
       });
       observer.observe(container);
     }
-
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
       window.removeEventListener('resize', handleResize);
-      if (observer) {
-        observer.disconnect();
-      }
+      if (observer) observer.disconnect();
     };
   }, [map]);
   return null;
 }
 
 export default function TabDualMaps() {
-  const [gridData, setGridData] = useState([]);
-  const [clickPoints, setClickPoints] = useState([]);
+  const { theme, t } = useSettings();
+  const [pointsData, setPointsData] = useState([]);
   const [loadingAll, setLoadingAll] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [clickLoading, setClickLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [fetched, setFetched] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Click scan states
+  const [clickPoints, setClickPoints] = useState([]);
+  const [clickLoading, setClickLoading] = useState(false);
   const [lastClick, setLastClick] = useState(null);
 
   const loadAllPoints = async () => {
     setLoadingAll(true);
-    setError(null);
     setProgress(0);
-    const BATCH = 10;
+    setError(null);
+    setPointsData([]);
     const results = [];
-    try {
-      for (let i = 0; i < ALL_RISK_POINTS.length; i += BATCH) {
-        const batch = ALL_RISK_POINTS.slice(i, i + BATCH);
-        const batchResults = await Promise.all(
-          batch.map(async pt => {
-            try {
-              const pred = await fetchPrediction(pt.lat, pt.lon);
-              return { ...pt, prediction: pred };
-            } catch {
-              return { ...pt, prediction: null };
-            }
-          })
-        );
-        results.push(...batchResults);
-        setProgress(Math.round((results.length / ALL_RISK_POINTS.length) * 100));
+    
+    // Chunk points to scan sequentially
+    for (let i = 0; i < ALL_RISK_POINTS.length; i++) {
+      const pt = ALL_RISK_POINTS[i];
+      try {
+        const pred = await fetchPrediction(pt.lat, pt.lon);
+        results.push({ ...pt, id: `preset-${i}`, prediction: pred });
+      } catch (err) {
+        console.warn(`Scan failed for ${pt.label}:`, err);
       }
-      setGridData(results);
-      setFetched(true);
-    } catch {
-      setError('Failed to load predictions.');
-    } finally {
-      setLoadingAll(false);
+      setProgress(Math.round(((i + 1) / ALL_RISK_POINTS.length) * 100));
     }
+    
+    setPointsData(results);
+    setFetched(true);
+    setLoadingAll(false);
   };
 
-  const handleMapClick = useCallback(async (lat, lon) => {
+  const handleMapClick = async (lat, lon) => {
     setClickLoading(true);
     setError(null);
     try {
+      const label = `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
       const pred = await fetchPrediction(lat, lon);
-      const id = `c_${lat.toFixed(3)}_${lon.toFixed(3)}`;
-      const newPt = { lat, lon, label: `${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E`, id, prediction: pred };
+      const newPt = { lat, lon, label, id: `click-${Date.now()}`, prediction: pred };
+      setClickPoints(prev => [...prev, newPt]);
       setLastClick(newPt);
-      setClickPoints(prev => {
-        const idx = prev.findIndex(p => p.id === id);
-        if (idx >= 0) { const u = [...prev]; u[idx] = newPt; return u; }
-        return [...prev, newPt];
-      });
     } catch (err) {
-      setError(err.response?.data?.detail || 'Click prediction failed.');
+      setError(err.response?.data?.detail || 'Map coordinate scan failed');
     } finally {
       setClickLoading(false);
     }
-  }, []);
+  };
 
-  const allPts = [...gridData, ...clickPoints].filter(pt => pt.prediction);
-  const floodVisible = allPts.filter(pt => pt.prediction.predictions.flood_risk_pct >= FLOOD_THRESHOLD);
-  const lsVisible = allPts.filter(pt => pt.prediction.predictions.landslide_risk_pct >= LANDSLIDE_THRESHOLD);
+  // Filter lists based on thresholds
+  const allAvailable = [...pointsData, ...clickPoints];
+  const floodVisible = allAvailable.filter(pt => pt.prediction.predictions.flood_risk_pct >= FLOOD_THRESHOLD);
+  const lsVisible = allAvailable.filter(pt => pt.prediction.predictions.landslide_risk_pct >= LANDSLIDE_THRESHOLD);
 
   return (
     <div className="flex flex-col gap-4 flex-1 h-full min-h-[500px]">
       {/* Controls */}
-      <div className="glass p-4 rounded-2xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shrink-0">
+      <div className="glass p-4 rounded-2xl border border-slate-200/10 dark:border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shrink-0">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center shrink-0 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-            <Layers size={24} className="text-indigo-400" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center shrink-0 border border-indigo-500/30">
+            <Layers size={24} className="text-indigo-500 dark:text-indigo-400" />
           </div>
           <div>
-            <h2 className="text-lg font-extrabold text-slate-100 tracking-tight">Risk Heat Map — India & Beyond</h2>
-            <p className="text-[11px] text-slate-400 uppercase tracking-widest mt-0.5">Click anywhere on either map to scan a custom point</p>
+            <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-900 dark:text-slate-100 tracking-tight">Risk Heat Map — India</h2>
+            <p className="text-[11px] text-slate-500 dark:text-slate-600 dark:text-slate-400 uppercase tracking-widest mt-0.5">{t('clickMapHint')}</p>
           </div>
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-4">
           <div className="flex items-center gap-3 text-xs font-semibold">
-            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></span><span className="text-slate-300">30–60% Mod</span></div>
-            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span><span className="text-slate-300">60–100% High</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span className="text-slate-600 dark:text-slate-750 dark:text-slate-300">30–60% Mod</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span><span className="text-slate-600 dark:text-slate-750 dark:text-slate-300">60–100% High</span></div>
           </div>
           <button
-            className={`px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all duration-300 ${loadingAll ? 'bg-slate-800 text-slate-400 cursor-not-allowed border border-white/5' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/25 border border-blue-500/30'}`}
+            className={`px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all duration-300 ${loadingAll ? 'bg-slate-300 dark:bg-slate-800 text-slate-600 dark:text-slate-400 cursor-not-allowed border border-slate-200/10 dark:border-white/5' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/20'}`}
             onClick={loadAllPoints}
             disabled={loadingAll}
           >
             {loadingAll ? (
-              <><div className="w-4 h-4 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" /> Scanning {progress}%</>
-            ) : fetched ? 'Re-Load Risk Zones' : 'Load Risk Zones'}
+              <><div className="w-4 h-4 rounded-full border-2 border-slate-400 border-t-transparent animate-spin" /> {t('scanningSubcontinent')} {progress}%</>
+            ) : fetched ? t('reloadRiskZones') : t('loadRiskZones')}
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium shrink-0">
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm font-medium shrink-0">
           {error}
         </div>
       )}
 
       {!fetched && !loadingAll && (
-        <div className="glass flex-1 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center opacity-60 min-h-[400px]">
-          <Layers size={48} className="text-slate-500 mb-4" />
-          <h3 className="text-lg font-bold text-slate-300 mb-2">Maps Uninitialized</h3>
-          <p className="text-sm text-slate-500 max-w-md">
-            Click <strong>"Load Risk Zones"</strong> to fetch predictions for <strong>{ALL_RISK_POINTS.length} locations</strong>.
+        <div className="glass flex-1 rounded-2xl border border-slate-200/10 dark:border-white/5 flex flex-col items-center justify-center text-center opacity-60 min-h-[400px]">
+          <Layers size={48} className="text-slate-600 dark:text-slate-400 mb-4" />
+          <h3 className="text-lg font-bold text-slate-700 dark:text-slate-750 dark:text-slate-300 mb-2">{t('mapsUninitialized')}</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-600 dark:text-slate-400 max-w-md">
+            Click <strong>"{t('loadRiskZones')}"</strong> to fetch predictions for <strong>{ALL_RISK_POINTS.length} locations</strong>.
             Only locations with ≥30% risk will be displayed.
           </p>
         </div>
       )}
 
       {loadingAll && (
-        <div className="glass flex-1 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center min-h-[400px]">
+        <div className="glass flex-1 rounded-2xl border border-slate-200/10 dark:border-white/5 flex flex-col items-center justify-center text-center min-h-[400px]">
           <div className="w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin mb-4" />
-          <h3 className="text-lg font-bold text-blue-400 mb-1">Scanning Subcontinent... {progress}%</h3>
-          <p className="text-xs text-slate-400">Processing batch {Math.round(progress * ALL_RISK_POINTS.length / 100)} of {ALL_RISK_POINTS.length}</p>
+          <h3 className="text-lg font-bold text-blue-600 dark:text-blue-400 mb-1">{t('scanningSubcontinent')} {progress}%</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-600 dark:text-slate-400">{t('processingBatch')} {Math.round(progress * ALL_RISK_POINTS.length / 100)} of {ALL_RISK_POINTS.length}</p>
         </div>
       )}
 
@@ -237,11 +225,14 @@ export default function TabDualMaps() {
       {(fetched || clickPoints.length > 0) && !loadingAll && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[450px]">
           {/* Flood Map */}
-          <div className="relative glass-card-blue rounded-[2rem] border border-blue-500/20 overflow-hidden shadow-[0_10px_40px_rgba(59,130,246,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(59,130,246,0.25)] w-full h-[350px] lg:h-[calc(100vh-220px)] lg:min-h-[450px] lg:max-h-[750px]">
+          <div className="relative rounded-[2rem] border border-blue-500/20 overflow-hidden shadow-lg w-full h-[350px] lg:h-[calc(100vh-220px)] lg:min-h-[450px] lg:max-h-[750px]">
             <MapContainer center={[22, 82]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
               <TileLayer
                 attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                url={theme === 'dark' 
+                  ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" 
+                  : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                }
               />
               <ClickCaptureLayer onMapClick={handleMapClick} />
               <MapSizeFixer />
@@ -259,8 +250,8 @@ export default function TabDualMaps() {
                 >
                   <Popup className="premium-popup">
                     <div className="font-sans text-xs min-w-[140px]">
-                      <strong className="block text-sm mb-1">{pt.label}</strong>
-                      <div className="flex justify-between items-center bg-blue-500/10 p-1.5 rounded text-blue-400 mb-1">
+                      <strong className="block text-sm mb-1 text-slate-800 dark:text-slate-800 dark:text-slate-200">{pt.label}</strong>
+                      <div className="flex justify-between items-center bg-blue-500/10 p-1.5 rounded text-blue-600 dark:text-blue-400 mb-1">
                         <span className="font-semibold flex items-center gap-1"><Droplets size={12}/> Flood</span>
                         <span className="font-bold text-sm">{pt.prediction.predictions.flood_risk_pct}%</span>
                       </div>
@@ -270,22 +261,25 @@ export default function TabDualMaps() {
                 </CircleMarker>
               ))}
             </MapContainer>
-            <div className="absolute top-5 left-5 z-[1000] bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-blue-500/40 text-sm font-extrabold text-blue-400 flex items-center gap-3 shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
-              <div className="animate-float"><Droplets size={18} /></div>
-              FLOOD RISK
-              <span className="bg-blue-500/20 text-[10px] px-2.5 py-1 rounded-full text-blue-300 ml-2 border border-blue-500/30">
-                {floodVisible.length} zones
+            <div className="absolute top-5 left-5 z-[1000] bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-blue-500/40 text-sm font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-3 shadow-lg">
+              <div><Droplets size={18} /></div>
+              {t('floodRiskOverlay')}
+              <span className="bg-blue-500/10 text-[10px] px-2.5 py-1 rounded-full text-blue-600 dark:text-blue-300 ml-2 border border-blue-500/20">
+                {floodVisible.length} {t('zonesText')}
               </span>
             </div>
-            {clickLoading && <div className="absolute inset-0 bg-slate-950/40 z-[999] backdrop-blur-sm flex items-center justify-center"><div className="w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin shadow-[0_0_20px_rgba(59,130,246,0.5)]" /></div>}
+            {clickLoading && <div className="absolute inset-0 bg-slate-950/40 z-[999] backdrop-blur-sm flex items-center justify-center"><div className="w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" /></div>}
           </div>
 
           {/* Landslide Map */}
-          <div className="relative glass-card-amber rounded-[2rem] border border-amber-500/20 overflow-hidden shadow-[0_10px_40px_rgba(245,158,11,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(245,158,11,0.25)] w-full h-[350px] lg:h-[calc(100vh-220px)] lg:min-h-[450px] lg:max-h-[750px]">
+          <div className="relative rounded-[2rem] border border-amber-500/20 overflow-hidden shadow-lg w-full h-[350px] lg:h-[calc(100vh-220px)] lg:min-h-[450px] lg:max-h-[750px]">
             <MapContainer center={[22, 82]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
               <TileLayer
                 attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                url={theme === 'dark' 
+                  ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" 
+                  : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                }
               />
               <ClickCaptureLayer onMapClick={handleMapClick} />
               <MapSizeFixer />
@@ -303,8 +297,8 @@ export default function TabDualMaps() {
                 >
                   <Popup className="premium-popup">
                     <div className="font-sans text-xs min-w-[140px]">
-                      <strong className="block text-sm mb-1">{pt.label}</strong>
-                      <div className="flex justify-between items-center bg-amber-500/10 p-1.5 rounded text-amber-500 mb-1">
+                      <strong className="block text-sm mb-1 text-slate-800 dark:text-slate-800 dark:text-slate-200">{pt.label}</strong>
+                      <div className="flex justify-between items-center bg-amber-500/10 p-1.5 rounded text-amber-600 dark:text-amber-500 mb-1">
                         <span className="font-semibold flex items-center gap-1"><Mountain size={12}/> Landslide</span>
                         <span className="font-bold text-sm">{pt.prediction.predictions.landslide_risk_pct}%</span>
                       </div>
@@ -314,32 +308,32 @@ export default function TabDualMaps() {
                 </CircleMarker>
               ))}
             </MapContainer>
-            <div className="absolute top-5 left-5 z-[1000] bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-amber-500/40 text-sm font-extrabold text-amber-500 flex items-center gap-3 shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
-              <div className="animate-float"><Mountain size={18} /></div>
-              LANDSLIDE RISK
-              <span className="bg-amber-500/20 text-[10px] px-2.5 py-1 rounded-full text-amber-400 ml-2 border border-amber-500/30">
-                {lsVisible.length} zones
+            <div className="absolute top-5 left-5 z-[1000] bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-amber-500/40 text-sm font-extrabold text-amber-600 dark:text-amber-500 flex items-center gap-3 shadow-lg">
+              <div><Mountain size={18} /></div>
+              {t('landslideRiskOverlay')}
+              <span className="bg-amber-500/10 text-[10px] px-2.5 py-1 rounded-full text-amber-600 dark:text-amber-400 ml-2 border border-amber-500/20">
+                {lsVisible.length} {t('zonesText')}
               </span>
             </div>
-            {clickLoading && <div className="absolute inset-0 bg-slate-950/40 z-[999] backdrop-blur-sm flex items-center justify-center"><div className="w-12 h-12 rounded-full border-4 border-amber-500 border-t-transparent animate-spin shadow-[0_0_20px_rgba(245,158,11,0.5)]" /></div>}
+            {clickLoading && <div className="absolute inset-0 bg-slate-950/40 z-[999] backdrop-blur-sm flex items-center justify-center"><div className="w-12 h-12 rounded-full border-4 border-amber-500 border-t-transparent animate-spin" /></div>}
           </div>
         </div>
       )}
 
       {lastClick?.prediction && (
-        <div className="glass px-4 py-3 rounded-xl border border-white/10 flex flex-col sm:flex-row sm:items-center gap-3 shadow-lg shrink-0 animate-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-200">
-            <MapPin size={16} className="text-indigo-400" />
-            {lastClick.label}
+        <div className="glass px-4 py-3 rounded-xl border border-slate-200/10 dark:border-white/10 flex flex-col sm:flex-row sm:items-center gap-3 shadow-lg shrink-0 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-800 dark:text-slate-200">
+            <MapPin size={16} className="text-indigo-500 dark:text-indigo-400" />
+            {t('clickResultLabel')}: {lastClick.label}
           </div>
           <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <Droplets size={14} className="text-blue-400" />
-              <span className="text-xs font-semibold text-blue-300">Flood: <span className="font-bold text-blue-400">{lastClick.prediction.predictions.flood_risk_pct}%</span></span>
+              <Droplets size={14} className="text-blue-500 dark:text-blue-400" />
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-300">{t('floodRiskLabel')}: <span className="font-bold text-blue-600 dark:text-blue-400">{lastClick.prediction.predictions.flood_risk_pct}%</span></span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <Mountain size={14} className="text-amber-500" />
-              <span className="text-xs font-semibold text-amber-400">Landslide: <span className="font-bold text-amber-500">{lastClick.prediction.predictions.landslide_risk_pct}%</span></span>
+              <Mountain size={14} className="text-amber-600 dark:text-amber-500" />
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{t('landslideRiskLabel')}: <span className="font-bold text-amber-600 dark:text-amber-500">{lastClick.prediction.predictions.landslide_risk_pct}%</span></span>
             </div>
           </div>
         </div>

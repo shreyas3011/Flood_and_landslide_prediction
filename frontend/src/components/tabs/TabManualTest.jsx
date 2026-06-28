@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSettings } from '../../context/SettingsContext';
 import { Droplets, Mountain } from 'lucide-react';
 import axios from 'axios';
 import { getRiskColor, getRiskLabel, getRiskIcon, getRiskAdvice } from '../../utils/riskUtils';
@@ -292,15 +293,127 @@ function ManualResultBar({ label, mlPct, finalPct, capPct, color, icon }) {
   );
 }
 
+const FLOOD_PRESETS = {
+  kerala: {
+    name: '🌊 Kerala Floods 2018',
+    date: '2018-08-15',
+    desc: 'Catastrophic flooding in Kerala, triggered by unusually heavy rainfall during the monsoon season.',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Flooded-home-companypady-2018-kerala-floods.jpg/500px-Flooded-home-companypady-2018-kerala-floods.jpg',
+    gallery: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Flooded-home-companypady-2018-kerala-floods.jpg/500px-Flooded-home-companypady-2018-kerala-floods.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Flood_kerala_2018.jpg/500px-Flood_kerala_2018.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/KeralaFlood000050.jpg/500px-KeralaFlood000050.jpg'
+    ],
+    params: {
+      rainfall_mm: 220.0, temp_max_c: 26.5, temp_min_c: 22.0, humidity_pct: 98,
+      wind_speed_kmh: 28.0, precipitation_hours: 24, evapotranspiration_mm: 1.8,
+      elevation_m: 15, river_discharge_m3s: 1500.0, month: 8, year: 2018
+    }
+  },
+  assam: {
+    name: '🌧️ Assam Floods 2022',
+    date: '2022-06-16',
+    desc: 'Severe floods in Northeast India affecting millions, caused by relentless rain swelling the Brahmaputra River.',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Flood_affected_house_%282%29.jpg/500px-Flood_affected_house_%282%29.jpg',
+    gallery: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Flood_affected_house_%282%29.jpg/500px-Flood_affected_house_%282%29.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/An_aerial_view_of_flood-affected_areas_of_Assam_on_July_02%2C_2012_%281%29.jpg/500px-An_aerial_view_of_flood-affected_areas_of_Assam_on_July_02%2C_2012_%281%29.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f2/Flood_at_barbhag.jpg/500px-Flood_at_barbhag.jpg'
+    ],
+    params: {
+      rainfall_mm: 175.0, temp_max_c: 27.5, temp_min_c: 23.0, humidity_pct: 97,
+      wind_speed_kmh: 22.0, precipitation_hours: 20, evapotranspiration_mm: 2.1,
+      elevation_m: 55, river_discharge_m3s: 3800.0, month: 6, year: 2022
+    }
+  },
+  mumbai: {
+    name: '⛈️ Mumbai Floods 2005',
+    date: '2005-07-26',
+    desc: 'Devastating urban flooding in India\'s financial capital following an unprecedented 944 mm deluge in 24 hours.',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Bombay_flooded_street.jpg/500px-Bombay_flooded_street.jpg',
+    gallery: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Bombay_flooded_street.jpg/500px-Bombay_flooded_street.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Bombay_flooded_street2.jpg/500px-Bombay_flooded_street2.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Mumbai_monsoon_2.jpg/500px-Mumbai_monsoon_2.jpg'
+    ],
+    params: {
+      rainfall_mm: 350.0, temp_max_c: 28.0, temp_min_c: 24.0, humidity_pct: 100,
+      wind_speed_kmh: 35.0, precipitation_hours: 24, evapotranspiration_mm: 1.2,
+      elevation_m: 10, river_discharge_m3s: 500.0, month: 7, year: 2005
+    }
+  }
+};
+
+const LANDSLIDE_PRESETS = {
+  kedarnath: {
+    name: '⛰️ Kedarnath Landslide 2013',
+    date: '2013-06-16',
+    desc: 'Devastating landslides and flash floods in Uttarakhand triggered by sudden cloudbursts and glacier melt.',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Mandakini-left-bank-broken-bridge-rudraprayag-sangam-g.jpg/500px-Mandakini-left-bank-broken-bridge-rudraprayag-sangam-g.jpg',
+    gallery: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Mandakini-left-bank-broken-bridge-rudraprayag-sangam-g.jpg/500px-Mandakini-left-bank-broken-bridge-rudraprayag-sangam-g.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/P1000111_pano-rudraprayag-sangam-crp-g-2600w.jpg/500px-P1000111_pano-rudraprayag-sangam-crp-g-2600w.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/North_India_June_2013_satellite_postflood.jpg/500px-North_India_June_2013_satellite_postflood.jpg'
+    ],
+    params: {
+      rainfall_mm: 320.0, antecedent_7day_mm: 450.0, temp_max_c: 15.0, temp_min_c: 8.0,
+      humidity_pct: 100, wind_speed_kmh: 32.0, precipitation_hours: 24, evapotranspiration_mm: 1.1,
+      soil_moisture: 0.78, elevation_m: 3584, river_discharge_m3s: 850.0, flood_nearby: 1,
+      month: 6, year: 2013
+    }
+  },
+  malin: {
+    name: '🏔️ Malin Landslide 2014',
+    date: '2014-07-30',
+    desc: 'Catastrophic landslide in Malin village, Pune district, burying the village under mud after heavy monsoon rains.',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Landslide_during_the_floods_in_Patan_block%2C_Satara1.jpg/500px-Landslide_during_the_floods_in_Patan_block%2C_Satara1.jpg',
+    gallery: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Landslide_during_the_floods_in_Patan_block%2C_Satara1.jpg/500px-Landslide_during_the_floods_in_Patan_block%2C_Satara1.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Landslide_during_the_floods_in_Patan_block%2C_Satara2.jpg/500px-Landslide_during_the_floods_in_Patan_block%2C_Satara2.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Landslide_during_the_floods_in_Patan_block%2C_Satara3.jpg/500px-Landslide_during_the_floods_in_Patan_block%2C_Satara3.jpg'
+    ],
+    params: {
+      rainfall_mm: 108.0, antecedent_7day_mm: 320.0, temp_max_c: 24.0, temp_min_c: 18.0,
+      humidity_pct: 98, wind_speed_kmh: 18.0, precipitation_hours: 18, evapotranspiration_mm: 2.0,
+      soil_moisture: 0.65, elevation_m: 800, river_discharge_m3s: 150.0, flood_nearby: 0,
+      month: 7, year: 2014
+    }
+  },
+  wayanad: {
+    name: '🧗 Wayanad Landslide 2024',
+    date: '2024-07-30',
+    desc: 'Massive landslides in mountainous regions of Wayanad, Kerala, triggered by extreme monsoon rainfall.',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Wayanad_landslides_aftermath.jpg/500px-Wayanad_landslides_aftermath.jpg',
+    gallery: [
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Wayanad_landslides_aftermath.jpg/500px-Wayanad_landslides_aftermath.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Chooralmala_landslides_aftermath.jpg/500px-Chooralmala_landslides_aftermath.jpg',
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Remnants_of_2024_Wayanad_landslides_disaster_at_Mundakkai.jpg/500px-Remnants_of_2024_Wayanad_landslides_disaster_at_Mundakkai.jpg'
+    ],
+    params: {
+      rainfall_mm: 280.0, antecedent_7day_mm: 350.0, temp_max_c: 22.0, temp_min_c: 19.0,
+      humidity_pct: 99, wind_speed_kmh: 24.0, precipitation_hours: 24, evapotranspiration_mm: 1.5,
+      soil_moisture: 0.72, elevation_m: 1100, river_discharge_m3s: 200.0, flood_nearby: 1,
+      month: 7, year: 2024
+    }
+  }
+};
+
 // ── Flood Manual Test Sub-Tab ──
 function FloodManualTest() {
-  const [params, setParams] = useState(FLOOD_DEFAULT_PARAMS);
+  const { t } = useSettings();
+  const [activePreset, setActivePreset] = useState('kerala');
+  const [params, setParams] = useState(() => {
+    const raw = FLOOD_PRESETS.kerala.params;
+    const engineered = calculateFloodEngineered(raw);
+    return { ...raw, ...engineered };
+  });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [autoCalc, setAutoCalc] = useState(true);
 
   const handleRawChange = (key, val) => {
+    setActivePreset(null);
     const numericVal = parseFloat(val);
     setParams(prev => {
       const nextParams = { ...prev, [key]: numericVal };
@@ -313,27 +426,16 @@ function FloodManualTest() {
   };
 
   const handleEngineeredChange = (key, val) => {
+    setActivePreset(null);
     setAutoCalc(false); // Disable auto-calculate if user overrides an engineered parameter manually
     setParams(prev => ({ ...prev, [key]: parseFloat(val) }));
   };
 
-  const handlePreset = (preset) => {
-    let raw = {};
-    if (preset === 'extreme') raw = {
-      rainfall_mm: 236.6, temp_max_c: 27.1, temp_min_c: 25.6, humidity_pct: 97,
-      wind_speed_kmh: 43.3, precipitation_hours: 24, evapotranspiration_mm: 1.1,
-      elevation_m: 85, river_discharge_m3s: 0.66, month: 6, year: 2017,
-    };
-    if (preset === 'moderate') raw = {
-      rainfall_mm: 21.8, temp_max_c: 30.6, temp_min_c: 23.5, humidity_pct: 100,
-      wind_speed_kmh: 13.3, precipitation_hours: 13, evapotranspiration_mm: 3.62,
-      elevation_m: 8, river_discharge_m3s: 4.68, month: 11, year: 2022,
-    };
-    if (preset === 'safe') raw = {
-      rainfall_mm: 0, temp_max_c: 42.2, temp_min_c: 29.4, humidity_pct: 58,
-      wind_speed_kmh: 21.1, precipitation_hours: 0, evapotranspiration_mm: 9.96,
-      elevation_m: 204, river_discharge_m3s: 0, month: 5, year: 2026,
-    };
+  const handlePreset = (presetKey) => {
+    setActivePreset(presetKey);
+    const preset = FLOOD_PRESETS[presetKey];
+    if (!preset) return;
+    const raw = preset.params;
     const engineered = calculateFloodEngineered(raw);
     setParams({ ...raw, ...engineered });
     setResult(null);
@@ -379,39 +481,59 @@ function FloodManualTest() {
     <div className="manual-layout">
       <div className="manual-form-panel">
         <div className="glass-card" style={{ marginBottom: '1rem' }}>
-          <div className="manual-form-title">
+          <div className="manual-form-title" style={{ marginBottom: '1.25rem' }}>
             <Droplets size={20} className="icon-blue" />
-            Flood Prediction — Manual Training Parameters Test
-          </div>
-          <p className="search-panel-desc">
-            Directly test the flood model by passing the <strong>exact features used in training</strong>.
-            You can modify the engineered features manually to test the ML model's limits.
-          </p>
-          <div className="manual-model-badge" style={{ background: '#3b82f622', borderColor: '#3b82f644', color: '#60a5fa' }}>
-            <Droplets size={14} /> Model: Random Forest (Calibrated) · ROC-AUC: 0.906 · 21 total features · 15,167 training rows
+            {t('floodManualTitle')}
           </div>
 
-          <div className="section-label">Quick Presets (Real Events)</div>
-          <div className="quick-locs">
-            <button className="quick-loc-btn" onClick={() => handlePreset('extreme')} style={{ borderColor: '#ef444455' }}>🌊 Bangladesh 2017</button>
-            <button className="quick-loc-btn" onClick={() => handlePreset('moderate')} style={{ borderColor: '#f59e0b55' }}>🌧️ Indonesia Sumatra 2022</button>
-            <button className="quick-loc-btn" onClick={() => handlePreset('safe')} style={{ borderColor: '#10b98155' }}>☀️ Dry Day (No Rain)</button>
+          <div className="section-label">{t('quickPresetsTitle')}</div>
+          <div className="quick-locs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            {Object.keys(FLOOD_PRESETS).map(key => (
+              <button 
+                key={key} 
+                className={`quick-loc-btn ${activePreset === key ? 'active' : ''}`} 
+                onClick={() => handlePreset(key)} 
+                style={{ 
+                  borderColor: activePreset === key ? '#3b82f6' : '#3b82f655',
+                  background: activePreset === key ? '#3b82f622' : 'transparent',
+                  color: activePreset === key ? '#60a5fa' : '#94a3b8'
+                }}
+              >
+                {FLOOD_PRESETS[key].name}
+              </button>
+            ))}
           </div>
+
+          {activePreset && FLOOD_PRESETS[activePreset] && (
+            <div className="mt-3 p-3 rounded-xl bg-slate-100/80 dark:bg-slate-950/40 border border-white/5" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <img 
+                src={FLOOD_PRESETS[activePreset].image} 
+                alt={FLOOD_PRESETS[activePreset].name} 
+                className="w-16 h-16 object-cover rounded-lg shrink-0 border border-white/10" 
+                style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ffffff22' }}
+              />
+              <div>
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{FLOOD_PRESETS[activePreset].name}</div>
+                <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">📅 {t('dateLabel')}: {FLOOD_PRESETS[activePreset].date}</div>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 leading-normal">{FLOOD_PRESETS[activePreset].desc}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Raw Parameters section */}
         <div className="glass-card" style={{ marginBottom: '1rem' }}>
-          <div className="section-label" style={{ marginBottom: '1rem' }}>📋 Raw Inputs ({FLOOD_RAW_CONFIG.length})</div>
+          <div className="section-label" style={{ marginBottom: '1rem' }}>📋 {t('rawInputsTitle')} ({FLOOD_RAW_CONFIG.length})</div>
           <div className="manual-params-grid">
             {FLOOD_RAW_CONFIG.map(([key, label, unit, min, max, step, desc]) => (
               <div key={key} className="manual-param-row">
                 <div className="manual-param-header flex justify-between items-center">
-                  <span className="manual-param-label font-semibold text-slate-200 text-sm">{label}</span>
+                  <span className="manual-param-label font-semibold text-slate-800 dark:text-slate-200 text-sm">{label}</span>
                   {key === 'month' ? (
                     <select
                       value={Math.round(params[key] || 7)}
                       onChange={e => handleRawChange(key, e.target.value)}
-                      className="bg-slate-800 border border-slate-700 text-xs text-blue-400 font-bold rounded px-2 py-0.5 outline-none focus:border-blue-500/50"
+                      className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs text-blue-600 dark:text-blue-400 font-bold rounded px-2 py-0.5 outline-none focus:border-blue-500/50"
                     >
                       {MONTH_NAMES.map((name, idx) => (
                         <option key={name} value={idx + 1}>{name}</option>
@@ -426,9 +548,9 @@ function FloodManualTest() {
                         step={step}
                         value={params[key] !== undefined ? params[key] : 0}
                         onChange={e => handleRawChange(key, e.target.value)}
-                        className="w-20 bg-slate-800/80 border border-slate-700/50 rounded px-2 py-0.5 text-xs text-blue-400 font-bold text-right outline-none focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-20 bg-slate-200 dark:bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-300 dark:border-slate-700/50 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 font-bold text-right outline-none focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <span className="text-xs text-slate-400 font-medium">{unit}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{unit}</span>
                     </div>
                   )}
                 </div>
@@ -448,7 +570,7 @@ function FloodManualTest() {
         {/* Engineered Parameters section */}
         <div className="glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #ffffff11', paddingBottom: '0.5rem' }}>
-            <span className="section-label" style={{ margin: 0 }}>⚙️ Engineered Features ({FLOOD_ENGINEERED_CONFIG.length})</span>
+            <span className="section-label" style={{ margin: 0 }}>⚙️ {t('engineeredFeaturesTitle')} ({FLOOD_ENGINEERED_CONFIG.length})</span>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '13px', cursor: 'pointer', color: '#60a5fa' }}>
               <input type="checkbox" checked={autoCalc} onChange={e => {
                 setAutoCalc(e.target.checked);
@@ -456,7 +578,7 @@ function FloodManualTest() {
                   setParams(prev => ({ ...prev, ...calculateFloodEngineered(prev) }));
                 }
               }} style={{ cursor: 'pointer' }} />
-              Auto-Calculate
+              {t('autoCalculate')}
             </label>
           </div>
           
@@ -481,7 +603,7 @@ function FloodManualTest() {
 
           <button id="flood-manual-predict-btn" className="gps-btn" style={{ marginTop: '1.5rem', width: '100%' }}
             onClick={handleSubmit} disabled={loading}>
-            {loading ? <><div className="spinner-sm" /> Running Model...</> : <><Droplets size={18} /> Predict Flood Risk</>}
+            {loading ? <><div className="spinner-sm" /> {t('runningModel')}</> : <><Droplets size={18} /> {t('predictFloodBtn')}</>}
           </button>
         </div>
       </div>
@@ -489,10 +611,31 @@ function FloodManualTest() {
       <div className="manual-result-panel">
         {error && <div className="error-card">{error}</div>}
         {!result && !loading && (
-          <div className="empty-card empty-card-lg">
-            <Droplets size={48} className="empty-icon" />
-            <p>Set flood parameters on the left and click <strong>Predict Flood Risk</strong>.</p>
-            <p style={{ marginTop: '0.5rem', fontSize: '13px', opacity: 0.6 }}>Passes all 21 training features directly to the ML model for evaluation.</p>
+          <div className="flex flex-col gap-4 w-full">
+            <div className="empty-card empty-card-lg" style={{ minHeight: 'auto', padding: '2rem 1.5rem' }}>
+              <Droplets size={40} className="empty-icon" style={{ marginBottom: '0.75rem' }} />
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Set flood parameters on the left and click <strong>{t('predictFloodBtn')}</strong>.</p>
+            </div>
+            
+            {activePreset && FLOOD_PRESETS[activePreset] && (
+              <div className="glass-card" style={{ marginTop: '1rem' }}>
+                <div className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">🖼️ {FLOOD_PRESETS[activePreset].name} Gallery</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                  {FLOOD_PRESETS[activePreset].gallery.map((imgUrl, i) => (
+                    <div key={i} className="relative group overflow-hidden rounded-xl border border-white/5 shadow-md" style={{ aspectRatio: '4/3', background: '#020617' }}>
+                      <img 
+                        src={imgUrl} 
+                        alt={`${FLOOD_PRESETS[activePreset].name} - ${i+1}`} 
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5">
+                        <span className="text-[10px] text-slate-800 dark:text-slate-200 font-medium">Disaster scene photo {i+1}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {loading && (
@@ -519,7 +662,7 @@ function FloodManualTest() {
                 icon={<Droplets size={18} className="icon-blue" />} />
             </div>
             <div className="glass-card live-factors-card">
-              <div className="live-factors-title">Evaluation Logic</div>
+              <div className="live-factors-title">{t('evaluationLogicTitle')}</div>
               <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.7 }}>
                 <p>① <span style={{ color: '#60a5fa' }}>Raw ML ({result.raw_ml_probability}%)</span> — Random Forest Model evaluated directly on the 21 input features.</p>
                 <p>② <span style={{ color: '#a78bfa' }}>Physics Cap ({result.physics_cap}%)</span> — Calculated using rain, river discharge, and elevation.</p>
@@ -535,13 +678,20 @@ function FloodManualTest() {
 
 // ── Landslide Manual Test Sub-Tab ──
 function LandslideManualTest() {
-  const [params, setParams] = useState(LANDSLIDE_DEFAULT_PARAMS);
+  const { t } = useSettings();
+  const [activePreset, setActivePreset] = useState('kedarnath');
+  const [params, setParams] = useState(() => {
+    const raw = LANDSLIDE_PRESETS.kedarnath.params;
+    const engineered = calculateLandslideEngineered(raw);
+    return { ...raw, ...engineered };
+  });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [autoCalc, setAutoCalc] = useState(true);
 
   const handleRawChange = (key, val) => {
+    setActivePreset(null);
     const numericVal = parseFloat(val);
     setParams(prev => {
       const nextParams = { ...prev, [key]: numericVal };
@@ -554,30 +704,16 @@ function LandslideManualTest() {
   };
 
   const handleEngineeredChange = (key, val) => {
+    setActivePreset(null);
     setAutoCalc(false); // Disable auto-calculate if user overrides an engineered parameter manually
     setParams(prev => ({ ...prev, [key]: parseFloat(val) }));
   };
 
-  const handlePreset = (preset) => {
-    let raw = {};
-    if (preset === 'extreme') raw = {
-      rainfall_mm: 379.2, antecedent_7day_mm: 190.7, temp_max_c: 24.3, temp_min_c: 22.8,
-      humidity_pct: 100, wind_speed_kmh: 26.3, precipitation_hours: 24, evapotranspiration_mm: 0.42,
-      soil_moisture: 0.43, elevation_m: 142, river_discharge_m3s: 15.52, flood_nearby: 0,
-      month: 4, year: 2022,
-    };
-    if (preset === 'moderate') raw = {
-      rainfall_mm: 7.8, antecedent_7day_mm: 147.5, temp_max_c: 24.5, temp_min_c: 21.6,
-      humidity_pct: 89, wind_speed_kmh: 5.8, precipitation_hours: 10, evapotranspiration_mm: 1.61,
-      soil_moisture: 0.497, elevation_m: 888, river_discharge_m3s: 5.22, flood_nearby: 0,
-      month: 6, year: 2022,
-    };
-    if (preset === 'safe') raw = {
-      rainfall_mm: 0, antecedent_7day_mm: 0.3, temp_max_c: 41.8, temp_min_c: 26.4,
-      humidity_pct: 60, wind_speed_kmh: 16.4, precipitation_hours: 0, evapotranspiration_mm: 8.94,
-      soil_moisture: 0.044, elevation_m: 204, river_discharge_m3s: 0, flood_nearby: 0,
-      month: 5, year: 2026,
-    };
+  const handlePreset = (presetKey) => {
+    setActivePreset(presetKey);
+    const preset = LANDSLIDE_PRESETS[presetKey];
+    if (!preset) return;
+    const raw = preset.params;
     const engineered = calculateLandslideEngineered(raw);
     setParams({ ...raw, ...engineered });
     setResult(null);
@@ -626,39 +762,59 @@ function LandslideManualTest() {
     <div className="manual-layout">
       <div className="manual-form-panel">
         <div className="glass-card" style={{ marginBottom: '1rem' }}>
-          <div className="manual-form-title">
+          <div className="manual-form-title" style={{ marginBottom: '1.25rem' }}>
             <Mountain size={20} className="icon-amber" />
-            Landslide Prediction — Manual Training Parameters Test
-          </div>
-          <p className="search-panel-desc">
-            Directly test the landslide model by passing the <strong>exact features used in training</strong>.
-            You can modify the engineered features manually to test the ML model's limits.
-          </p>
-          <div className="manual-model-badge" style={{ background: '#f59e0b22', borderColor: '#f59e0b44', color: '#fbbf24' }}>
-            <Mountain size={14} /> Model: Naive Bayes · ROC-AUC: 0.904 · 24 total features · 9,010 training rows
+            {t('landslideManualTitle')}
           </div>
 
-          <div className="section-label">Quick Presets (Real Events)</div>
-          <div className="quick-locs">
-            <button className="quick-loc-btn" onClick={() => handlePreset('extreme')} style={{ borderColor: '#ef444455' }}>⛰️ Philippines Leyte 2022</button>
-            <button className="quick-loc-btn" onClick={() => handlePreset('moderate')} style={{ borderColor: '#f59e0b55' }}>🏔️ India Nagaland 2022</button>
-            <button className="quick-loc-btn" onClick={() => handlePreset('safe')} style={{ borderColor: '#10b98155' }}>☀️ Safe Location (No Rain)</button>
+          <div className="section-label">{t('quickPresetsTitle')}</div>
+          <div className="quick-locs" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            {Object.keys(LANDSLIDE_PRESETS).map(key => (
+              <button 
+                key={key} 
+                className={`quick-loc-btn ${activePreset === key ? 'active' : ''}`} 
+                onClick={() => handlePreset(key)} 
+                style={{ 
+                  borderColor: activePreset === key ? '#f59e0b' : '#f59e0b55',
+                  background: activePreset === key ? '#f59e0b22' : 'transparent',
+                  color: activePreset === key ? '#fbbf24' : '#94a3b8'
+                }}
+              >
+                {LANDSLIDE_PRESETS[key].name}
+              </button>
+            ))}
           </div>
+
+          {activePreset && LANDSLIDE_PRESETS[activePreset] && (
+            <div className="mt-3 p-3 rounded-xl bg-slate-100/80 dark:bg-slate-950/40 border border-white/5" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <img 
+                src={LANDSLIDE_PRESETS[activePreset].image} 
+                alt={LANDSLIDE_PRESETS[activePreset].name} 
+                className="w-16 h-16 object-cover rounded-lg shrink-0 border border-white/10" 
+                style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #ffffff22' }}
+              />
+              <div>
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">{LANDSLIDE_PRESETS[activePreset].name}</div>
+                <div className="text-[10px] text-amber-400 font-semibold mt-0.5">📅 Date: {LANDSLIDE_PRESETS[activePreset].date}</div>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 leading-normal">{LANDSLIDE_PRESETS[activePreset].desc}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Raw Parameters section */}
         <div className="glass-card" style={{ marginBottom: '1rem' }}>
-          <div className="section-label" style={{ marginBottom: '1rem' }}>📋 Raw Inputs ({LANDSLIDE_RAW_CONFIG.length + 1})</div>
+          <div className="section-label" style={{ marginBottom: '1rem' }}>📋 {t('rawInputsTitle')} ({LANDSLIDE_RAW_CONFIG.length + 1})</div>
           <div className="manual-params-grid">
             {LANDSLIDE_RAW_CONFIG.map(([key, label, unit, min, max, step, desc]) => (
               <div key={key} className="manual-param-row">
                 <div className="manual-param-header flex justify-between items-center">
-                  <span className="manual-param-label font-semibold text-slate-200 text-sm">{label}</span>
+                  <span className="manual-param-label font-semibold text-slate-800 dark:text-slate-200 text-sm">{label}</span>
                   {key === 'month' ? (
                     <select
                       value={Math.round(params[key] || 7)}
                       onChange={e => handleRawChange(key, e.target.value)}
-                      className="bg-slate-800 border border-slate-700 text-xs text-blue-400 font-bold rounded px-2 py-0.5 outline-none focus:border-blue-500/50"
+                      className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs text-blue-600 dark:text-blue-400 font-bold rounded px-2 py-0.5 outline-none focus:border-blue-500/50"
                     >
                       {MONTH_NAMES.map((name, idx) => (
                         <option key={name} value={idx + 1}>{name}</option>
@@ -673,9 +829,9 @@ function LandslideManualTest() {
                         step={step}
                         value={params[key] !== undefined ? params[key] : 0}
                         onChange={e => handleRawChange(key, e.target.value)}
-                        className="w-20 bg-slate-800/80 border border-slate-700/50 rounded px-2 py-0.5 text-xs text-blue-400 font-bold text-right outline-none focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-20 bg-slate-200 dark:bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-300 dark:border-slate-700/50 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 font-bold text-right outline-none focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <span className="text-xs text-slate-400 font-medium">{unit}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{unit}</span>
                     </div>
                   )}
                 </div>
@@ -693,8 +849,8 @@ function LandslideManualTest() {
             {/* Flood Nearby toggle */}
             <div className="manual-param-row">
               <div className="manual-param-header flex justify-between items-center">
-                <span className="manual-param-label font-semibold text-slate-200 text-sm">Flood Nearby</span>
-                <span className="manual-param-unit font-bold text-blue-400 text-xs">{params.flood_nearby ? 'Yes' : 'No'}</span>
+                <span className="manual-param-label font-semibold text-slate-800 dark:text-slate-200 text-sm">Flood Nearby</span>
+                <span className="manual-param-unit font-bold text-blue-600 dark:text-blue-400 text-xs">{params.flood_nearby ? 'Yes' : 'No'}</span>
               </div>
               <p className="manual-param-desc">Is there a flood event nearby?</p>
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
@@ -711,7 +867,7 @@ function LandslideManualTest() {
         {/* Engineered Parameters section */}
         <div className="glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #ffffff11', paddingBottom: '0.5rem' }}>
-            <span className="section-label" style={{ margin: 0 }}>⚙️ Engineered Features ({LANDSLIDE_ENGINEERED_CONFIG.length})</span>
+            <span className="section-label" style={{ margin: 0 }}>⚙️ {t('engineeredFeaturesTitle')} ({LANDSLIDE_ENGINEERED_CONFIG.length})</span>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '13px', cursor: 'pointer', color: '#60a5fa' }}>
               <input type="checkbox" checked={autoCalc} onChange={e => {
                 setAutoCalc(e.target.checked);
@@ -719,7 +875,7 @@ function LandslideManualTest() {
                   setParams(prev => ({ ...prev, ...calculateLandslideEngineered(prev) }));
                 }
               }} style={{ cursor: 'pointer' }} />
-              Auto-Calculate
+              {t('autoCalculate')}
             </label>
           </div>
           
@@ -727,7 +883,7 @@ function LandslideManualTest() {
             {LANDSLIDE_ENGINEERED_CONFIG.map(([key, label, unit, min, max, step, desc]) => (
               <div key={key} className="manual-param-row" style={{ opacity: autoCalc ? 0.8 : 1, transition: 'opacity 0.2s' }}>
                 <div className="manual-param-header flex justify-between items-center">
-                  <span className="manual-param-label font-semibold text-slate-200 text-sm" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span className="manual-param-label font-semibold text-slate-800 dark:text-slate-200 text-sm" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {label} {autoCalc && <span style={{ fontSize: '10px', background: '#3b82f620', color: '#60a5fa', padding: '1px 4px', borderRadius: '4px', border: '1px solid #3b82f630' }}>Auto</span>}
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -739,9 +895,9 @@ function LandslideManualTest() {
                       disabled={autoCalc}
                       value={params[key] !== undefined ? params[key] : 0}
                       onChange={e => handleEngineeredChange(key, e.target.value)}
-                      className={`w-20 bg-slate-800/80 border rounded px-2 py-0.5 text-xs font-bold text-right outline-none focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${autoCalc ? 'text-blue-400 border-slate-700/30 cursor-not-allowed opacity-80' : 'text-amber-400 border-amber-500/30'}`}
+                      className={`w-20 bg-slate-200 dark:bg-slate-200/80 dark:bg-slate-800/80 border rounded px-2 py-0.5 text-xs font-bold text-right outline-none focus:border-blue-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${autoCalc ? 'text-blue-600 dark:text-blue-400 border-slate-300 dark:border-slate-700/30 cursor-not-allowed opacity-80' : 'text-amber-400 border-amber-500/30'}`}
                     />
-                    <span className="text-xs text-slate-400 font-medium">{unit}</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{unit}</span>
                   </div>
                 </div>
                 <p className="manual-param-desc">{desc}</p>
@@ -756,7 +912,7 @@ function LandslideManualTest() {
  
           <button id="landslide-manual-predict-btn" className="gps-btn" style={{ marginTop: '1.5rem', width: '100%' }}
             onClick={handleSubmit} disabled={loading}>
-            {loading ? <><div className="spinner-sm" /> Running Model...</> : <><Mountain size={18} /> Predict Landslide Risk</>}
+            {loading ? <><div className="spinner-sm" /> {t('runningModel')}</> : <><Mountain size={18} /> {t('predictLandslideBtn')}</>}
           </button>
         </div>
       </div>
@@ -764,10 +920,31 @@ function LandslideManualTest() {
       <div className="manual-result-panel">
         {error && <div className="error-card">{error}</div>}
         {!result && !loading && (
-          <div className="empty-card empty-card-lg">
-            <Mountain size={48} className="empty-icon" />
-            <p>Set landslide parameters on the left and click <strong>Predict Landslide Risk</strong>.</p>
-            <p style={{ marginTop: '0.5rem', fontSize: '13px', opacity: 0.6 }}>Passes all 24 training features directly to the ML model for evaluation.</p>
+          <div className="flex flex-col gap-4 w-full">
+            <div className="empty-card empty-card-lg" style={{ minHeight: 'auto', padding: '2rem 1.5rem' }}>
+              <Mountain size={40} className="empty-icon" style={{ marginBottom: '0.75rem' }} />
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Set landslide parameters on the left and click <strong>{t('predictLandslideBtn')}</strong>.</p>
+            </div>
+            
+            {activePreset && LANDSLIDE_PRESETS[activePreset] && (
+              <div className="glass-card" style={{ marginTop: '1rem' }}>
+                <div className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">🖼️ {LANDSLIDE_PRESETS[activePreset].name} Gallery</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                  {LANDSLIDE_PRESETS[activePreset].gallery.map((imgUrl, i) => (
+                    <div key={i} className="relative group overflow-hidden rounded-xl border border-white/5 shadow-md" style={{ aspectRatio: '4/3', background: '#020617' }}>
+                      <img 
+                        src={imgUrl} 
+                        alt={`${LANDSLIDE_PRESETS[activePreset].name} - ${i+1}`} 
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5">
+                        <span className="text-[10px] text-slate-800 dark:text-slate-200 font-medium">Disaster scene photo {i+1}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {loading && (
@@ -794,7 +971,7 @@ function LandslideManualTest() {
                 icon={<Mountain size={18} className="icon-amber" />} />
             </div>
             <div className="glass-card live-factors-card">
-              <div className="live-factors-title">Evaluation Logic</div>
+              <div className="live-factors-title">{t('evaluationLogicTitle')}</div>
               <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.7 }}>
                 <p>① <span style={{ color: '#60a5fa' }}>Raw ML ({result.raw_ml_probability}%)</span> — Naive Bayes Model evaluated directly on the 24 input features.</p>
                 <p>② <span style={{ color: '#a78bfa' }}>Physics Cap ({result.physics_cap}%)</span> — Calculated using rain, slope (elevation), and soil moisture.</p>
@@ -810,6 +987,7 @@ function LandslideManualTest() {
 
 // ── Tab wrapper with Flood / Landslide sub-tabs ──
 export default function TabManualTest() {
+  const { t } = useSettings();
   const [subTab, setSubTab] = useState('flood');
 
   return (
@@ -818,11 +996,11 @@ export default function TabManualTest() {
       <div className="manual-subtabs">
         <button className={`manual-subtab ${subTab === 'flood' ? 'manual-subtab-active manual-subtab-flood' : ''}`}
           onClick={() => setSubTab('flood')}>
-          <Droplets size={16} /> Flood Prediction
+          <Droplets size={16} /> {t('floodRiskLabel')}
         </button>
         <button className={`manual-subtab ${subTab === 'landslide' ? 'manual-subtab-active manual-subtab-landslide' : ''}`}
           onClick={() => setSubTab('landslide')}>
-          <Mountain size={16} /> Landslide Prediction
+          <Mountain size={16} /> {t('landslideRiskLabel')}
         </button>
       </div>
       {/* Sub-tab content */}
