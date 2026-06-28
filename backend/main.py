@@ -357,18 +357,9 @@ function evaluatePixel(s) {
 EVALSCRIPT_NDWI = """
 //VERSION=3
 function setup() {
-  return { input: ["B03","B08","SCL"], output: { bands: 3 } };
+  return { input: ["B03","B08"], output: { bands: 3 } };
 }
 function evaluatePixel(s) {
-  // SCL values: 8 = cloud medium probability, 9 = cloud high probability, 10 = thin cirrus
-  if (s.SCL === 8 || s.SCL === 9 || s.SCL === 10) {
-    return [0.9, 0.9, 0.95]; // Render clouds as bright white/grey
-  }
-  // SCL value: 3 = cloud shadow
-  if (s.SCL === 3) {
-    return [0.2, 0.2, 0.2]; // Render cloud shadows as dark grey
-  }
-
   let ndwi = (s.B03 - s.B08) / (s.B03 + s.B08 + 0.0001);
   if (ndwi > 0.2)       return [0.0, 0.3, 0.9];
   else if (ndwi > 0.0)  return [0.4, 0.7, 1.0];
