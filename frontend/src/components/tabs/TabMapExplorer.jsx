@@ -8,7 +8,9 @@ import { makeSafeZoneIcon, fmtDist, fmtTime } from '../../utils/mapUtils';
 import PredictionResult from '../ui/PredictionResult';
 import NearestSafeZonesPanel from '../ui/NearestSafeZonesPanel';
 
-const API_BASE = 'https://flood-and-landslide-prediction.onrender.com';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://flood-and-landslide-prediction.onrender.com';
 
 async function fetchPrediction(lat, lon) {
   const response = await axios.post(`${API_BASE}/predict`, { lat, lon });
@@ -53,7 +55,7 @@ export default function TabMapExplorer() {
   }, []);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-full min-w-0">
+    <div className="flex flex-col lg:flex-row gap-4 h-full w-full flex-1 min-w-0">
       {/* Sidebar */}
       <div className="w-full lg:w-72 xl:w-80 lg:flex-shrink-0 flex flex-col gap-3 overflow-y-auto pr-1 pb-4 custom-scrollbar">
         <div className="glass p-3 rounded-2xl border border-white/5 shadow-sm flex items-center gap-3">
@@ -115,7 +117,7 @@ export default function TabMapExplorer() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 min-w-0 glass rounded-2xl border border-white/5 overflow-hidden shadow-2xl relative h-[300px] lg:h-full min-h-[300px]">
+      <div className="flex-1 min-w-0 glass rounded-2xl border border-white/5 overflow-hidden shadow-2xl relative min-h-[350px] flex flex-col w-full">
         <MapContainer center={[20.5937, 78.9629]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'

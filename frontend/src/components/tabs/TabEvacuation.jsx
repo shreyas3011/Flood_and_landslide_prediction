@@ -3,7 +3,7 @@ import NearbyFacilities from '../NearbyFacilities';
 
 export default function TabEvacuation() {
   return (
-    <div className="h-full flex flex-col min-h-0 bg-transparent">
+    <div className="h-full w-full flex-1 flex flex-col min-h-[500px] bg-transparent">
       <NearbyFacilities />
     </div>
   );

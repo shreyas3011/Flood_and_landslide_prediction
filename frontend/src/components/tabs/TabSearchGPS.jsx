@@ -3,12 +3,15 @@ import axios from 'axios';
 import { Crosshair, Navigation, Search, MapPin } from 'lucide-react';
 import PredictionResult from '../ui/PredictionResult';
 import NearestSafeZonesPanel from '../ui/NearestSafeZonesPanel';
+import SatelliteImageViewer from '../ui/SatelliteImageViewer';
 import { findTopNSafeZones } from '../../services/orsService';
 import { SAFE_ZONES } from '../../data/safeZones';
 import { makeSafeZoneIcon, fmtDist, fmtTime, ZONE_META } from '../../utils/mapUtils';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 
-const API_BASE = 'https://flood-and-landslide-prediction.onrender.com';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://flood-and-landslide-prediction.onrender.com';
 
 async function fetchPrediction(lat, lon) {
   const response = await axios.post(`${API_BASE}/predict`, { lat, lon });
@@ -150,32 +153,107 @@ export default function TabSearchGPS() {
     }
     setGpsLoading(true);
     setError(null);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        // Reverse geocode to get actual place name
-        let locationLabel = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { 'User-Agent': 'GeoShield-AI/1.0' } }
-          );
-          const data = await res.json();
-          if (data && data.display_name) {
-            locationLabel = data.display_name.split(',').slice(0, 4).join(',').trim();
-          }
-        } catch (e) {
-          // Reverse geocode failed — show raw coordinates
+
+    // On mobile, the browser often fires the callback immediately with a rough
+    // WiFi / cell-tower fix (accuracy 500 m – 5 km) before the real GPS lock.
+    // We use watchPosition to keep collecting fixes and pick the best one
+    // within a timeout window, then cancel the watch.
+    const ACCURACY_THRESHOLD_M = 150;  // accept if within 150 m
+    const MAX_WAIT_MS          = 20000; // wait up to 20 s for a good fix
+    const FALLBACK_ACCEPT_MS   = 8000; // after 8 s, accept whatever we have
+
+    let watchId = null;
+    let bestPos = null;
+    let fallbackTimer = null;
+    let maxTimer = null;
+    let settled = false;
+
+    const finish = async (pos) => {
+      if (settled) return;
+      settled = true;
+
+      // Cancel the watch and any pending timers
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      clearTimeout(fallbackTimer);
+      clearTimeout(maxTimer);
+
+      const { latitude, longitude, accuracy } = pos.coords;
+      const accuracyNote = accuracy ? ` (±${Math.round(accuracy)} m)` : '';
+
+      let locationLabel = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+          { headers: { 'User-Agent': 'GeoShield-AI/1.0' } }
+        );
+        const data = await res.json();
+        if (data && data.display_name) {
+          locationLabel = data.display_name.split(',').slice(0, 4).join(',').trim() + accuracyNote;
+        } else {
+          locationLabel += accuracyNote;
         }
-        setGpsLoading(false);
-        runPrediction(latitude, longitude, locationLabel);
+      } catch (e) {
+        locationLabel += accuracyNote;
+      }
+
+      setGpsLoading(false);
+      runPrediction(latitude, longitude, locationLabel);
+    };
+
+    const onError = (err) => {
+      if (settled) return;
+      // If we already have any fix (even rough), use it rather than failing
+      if (bestPos) {
+        finish(bestPos);
+        return;
+      }
+      settled = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      clearTimeout(fallbackTimer);
+      clearTimeout(maxTimer);
+      setGpsLoading(false);
+
+      let msg = 'GPS error. Please allow location access or type a location manually.';
+      if (err.code === 1) msg = 'Location access denied. Please enable location permissions in your browser/phone settings.';
+      else if (err.code === 2) msg = 'Position unavailable. Make sure GPS is enabled on your device.';
+      else if (err.code === 3) msg = 'GPS timed out. Move to an open area with better signal and try again.';
+      setError(msg);
+    };
+
+    // Start watching — each new fix should be more accurate than the last
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const acc = pos.coords.accuracy;
+        // Keep the best (most accurate) fix seen so far
+        if (!bestPos || acc < bestPos.coords.accuracy) {
+          bestPos = pos;
+        }
+        // If accuracy is good enough, accept immediately
+        if (acc <= ACCURACY_THRESHOLD_M) {
+          finish(pos);
+        }
       },
-      (err) => {
-        setGpsLoading(false);
-        setError(`GPS error: ${err.message}. Please allow location access or type a location manually.`);
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+      onError,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: MAX_WAIT_MS }
     );
+
+    // After FALLBACK_ACCEPT_MS, accept whatever best fix we have (even if imprecise)
+    fallbackTimer = setTimeout(() => {
+      if (bestPos && !settled) {
+        finish(bestPos);
+      }
+    }, FALLBACK_ACCEPT_MS);
+
+    // Hard stop after MAX_WAIT_MS
+    maxTimer = setTimeout(() => {
+      if (!settled) {
+        if (bestPos) {
+          finish(bestPos);
+        } else {
+          onError({ code: 3, message: 'Timed out waiting for GPS fix.' });
+        }
+      }
+    }, MAX_WAIT_MS);
   };
 
 
@@ -248,7 +326,7 @@ export default function TabSearchGPS() {
             Detect My Location (GPS)
           </div>
           <p className="text-xs text-slate-400 mb-4">
-            Allow location access on your device to get an instant risk assessment for your current position.
+            Allow location access on your device. On mobile, the app waits up to 8 seconds for a precise GPS fix — move outdoors for best accuracy.
           </p>
           <button
             className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 font-semibold text-sm transition-all duration-300 ${gpsLoading ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-emerald-500 hover:from-blue-500 hover:to-emerald-400 text-white shadow-lg shadow-blue-500/25'}`}
@@ -256,7 +334,7 @@ export default function TabSearchGPS() {
             disabled={gpsLoading || loading}
           >
             {gpsLoading ? (
-              <><div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" /> Detecting Location...</>
+              <><div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" /> Acquiring GPS fix...</>
             ) : (
               <><Navigation size={18} /> Use My Current Location</>
             )}
@@ -417,6 +495,15 @@ export default function TabSearchGPS() {
                   </Marker>
                 ))}
               </MapContainer>
+            </div>
+
+            {/* ── Satellite Imagery Section ── */}
+            <div className="glass rounded-2xl border border-white/5 p-4 shadow-lg">
+              <SatelliteImageViewer
+                lat={coords.lat}
+                lon={coords.lon}
+                locationName={locationName}
+              />
             </div>
           </div>
         ) : (

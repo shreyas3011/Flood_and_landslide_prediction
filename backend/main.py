@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import requests
 from backend.predictor import predict_risk, engineer_flood_features, engineer_landslide_features, \
     flood_model, landslide_model, _physics_flood_cap, _physics_landslide_cap, flood_meta, landslide_meta
 
@@ -305,3 +306,229 @@ def predict_landslide_manual(req: LandslideManualRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SATELLITE IMAGERY PROXY  (keeps credentials server-side, avoids CORS)
+# ─────────────────────────────────────────────────────────────────────────────
+import base64
+import time
+from datetime import datetime, timedelta
+
+# Sentinel Hub / Copernicus Data Space credentials
+SH_CLIENT_ID     = "sh-605b1477-216c-4f1b-b5cc-3bbf38d7097e"
+SH_CLIENT_SECRET = "Ww16V3kKpDniBe65MCYVFv4UO3iSlL9B"
+SH_TOKEN_URL     = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+SH_PROCESS_URL   = "https://sh.dataspace.copernicus.eu/api/v1/process"
+
+# Token cache to avoid fetching a new one on every request
+_token_cache = {"token": None, "expires_at": 0}
+
+def _get_sh_token() -> str:
+    """Fetch or return cached Sentinel Hub OAuth access token."""
+    if _token_cache["token"] and time.time() < _token_cache["expires_at"]:
+        return _token_cache["token"]
+    resp = requests.post(
+        SH_TOKEN_URL,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={
+            "grant_type": "client_credentials",
+            "client_id": SH_CLIENT_ID,
+            "client_secret": SH_CLIENT_SECRET,
+        },
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        raise Exception(f"Sentinel Hub auth failed: {resp.status_code} {resp.text}")
+    data = resp.json()
+    _token_cache["token"] = data["access_token"]
+    _token_cache["expires_at"] = time.time() + data.get("expires_in", 3600) - 60
+    return _token_cache["token"]
+
+
+EVALSCRIPT_TRUE_COLOR = """
+//VERSION=3
+function setup() {
+  return { input: ["B02","B03","B04"], output: { bands: 3 } };
+}
+function evaluatePixel(s) {
+  return [2.5*s.B04, 2.5*s.B03, 2.5*s.B02];
+}
+"""
+
+EVALSCRIPT_NDWI = """
+//VERSION=3
+function setup() {
+  return { input: ["B03","B08"], output: { bands: 3 } };
+}
+function evaluatePixel(s) {
+  let ndwi = (s.B03 - s.B08) / (s.B03 + s.B08 + 0.0001);
+  if (ndwi > 0.2)       return [0.0, 0.3, 0.9];
+  else if (ndwi > 0.0)  return [0.4, 0.7, 1.0];
+  else                  return [0.1, 0.35, 0.1];
+}
+"""
+
+EVALSCRIPT_NDVI = """
+//VERSION=3
+function setup() {
+  return { input: ["B04","B08"], output: { bands: 3 } };
+}
+function evaluatePixel(s) {
+  let ndvi = (s.B08 - s.B04) / (s.B08 + s.B04 + 0.0001);
+  if (ndvi > 0.5)       return [0.0, 0.5, 0.1];
+  else if (ndvi > 0.2)  return [0.3, 0.7, 0.2];
+  else if (ndvi > 0.0)  return [0.7, 0.6, 0.2];
+  else                  return [0.6, 0.5, 0.4];
+}
+"""
+
+class SatelliteRequest(BaseModel):
+    lat: float
+    lon: float
+    image_type: str = "true_color"  # true_color | ndwi | ndvi
+    size_km: float = 8.0
+
+@app.post("/satellite/image")
+def get_satellite_image(req: SatelliteRequest):
+    """
+    Fetch a Sentinel-2 satellite image for the given coordinates.
+    Returns the image as a base64-encoded PNG string.
+    """
+    try:
+        token = _get_sh_token()
+
+        evalscript_map = {
+            "true_color": EVALSCRIPT_TRUE_COLOR,
+            "ndwi":       EVALSCRIPT_NDWI,
+            "ndvi":       EVALSCRIPT_NDVI,
+        }
+        evalscript = evalscript_map.get(req.image_type, EVALSCRIPT_TRUE_COLOR)
+
+        offset = req.size_km / 111.0
+        bbox = [
+            round(req.lon - offset, 6),
+            round(req.lat - offset, 6),
+            round(req.lon + offset, 6),
+            round(req.lat + offset, 6),
+        ]
+
+        end_date   = datetime.utcnow()
+        start_date = end_date - timedelta(days=90)
+
+        payload = {
+            "input": {
+                "bounds": {
+                    "bbox": bbox,
+                    "properties": {"crs": "http://www.opengis.net/def/crs/OGC/1.3/CRS84"},
+                },
+                "data": [{
+                    "dataFilter": {
+                        "timeRange": {
+                            "from": start_date.strftime("%Y-%m-%dT00:00:00Z"),
+                            "to":   end_date.strftime("%Y-%m-%dT23:59:59Z"),
+                        },
+                        "mosaickingOrder": "leastCC",
+                    },
+                    "type": "sentinel-2-l2a",
+                }],
+            },
+            "output": {
+                "width":  512,
+                "height": 512,
+                "responses": [{"identifier": "default", "format": {"type": "image/png"}}],
+            },
+            "evalscript": evalscript,
+        }
+
+        # Query Copernicus Catalog API to find the exact date & cloud cover of the selected image
+        img_date = None
+        cloud_cover = None
+        try:
+            catalog_payload = {
+                "bbox": bbox,
+                "datetime": f"{start_date.strftime('%Y-%m-%dT00:00:00Z')}/{end_date.strftime('%Y-%m-%dT23:59:59Z')}",
+                "collections": ["sentinel-2-l2a"],
+                "limit": 50
+            }
+            catalog_resp = requests.post(
+                "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search",
+                json=catalog_payload,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                timeout=15
+            )
+            if catalog_resp.status_code == 200:
+                features = catalog_resp.json().get("features", [])
+                if features:
+                    # Sort by cloud cover ascending (matches leastCC mosaicking)
+                    features.sort(key=lambda x: x.get("properties", {}).get("eo:cloud_cover", 100))
+                    best_feat = features[0]
+                    img_date = best_feat.get("properties", {}).get("datetime")
+                    cloud_cover = best_feat.get("properties", {}).get("eo:cloud_cover")
+        except Exception:
+            pass  # Fallback gracefully if catalog query fails
+
+        img_resp = requests.post(
+            SH_PROCESS_URL,
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            timeout=40,
+        )
+
+        if img_resp.status_code != 200:
+            raise HTTPException(
+                status_code=img_resp.status_code,
+                detail=f"Sentinel Hub Process API error: {img_resp.text[:500]}",
+            )
+
+        encoded = base64.b64encode(img_resp.content).decode("utf-8")
+        return {
+            "image_base64": encoded,
+            "format": "image/png",
+            "date": img_date,
+            "cloud_cover": cloud_cover
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RiverRequest(BaseModel):
+    lat: float
+    lon: float
+    radius_m: int = 30000
+
+@app.post("/satellite/river")
+def find_nearest_river(req: RiverRequest):
+    """
+    Find the nearest river to the given coordinates using the Overpass API.
+    Returns river name and center coordinates.
+    """
+    try:
+        overpass_url = "https://overpass-api.de/api/interpreter"
+        query = f"""
+[out:json][timeout:20];
+(
+  way["waterway"="river"](around:{req.radius_m},{req.lat},{req.lon});
+  way["waterway"="stream"](around:{req.radius_m},{req.lat},{req.lon});
+);
+out center 1;
+"""
+        resp = requests.post(overpass_url, data={"data": query}, timeout=25)
+        if resp.status_code != 200:
+            return {"found": False, "name": None, "lat": req.lat, "lon": req.lon}
+
+        elements = resp.json().get("elements", [])
+        if not elements:
+            return {"found": False, "name": None, "lat": req.lat, "lon": req.lon}
+
+        el = elements[0]
+        name = el.get("tags", {}).get("name") or el.get("tags", {}).get("name:en") or "Unnamed River"
+        center = el.get("center", {})
+        river_lat = center.get("lat", req.lat)
+        river_lon = center.get("lon", req.lon)
+
+        return {"found": True, "name": name, "lat": river_lat, "lon": river_lon}
+
+    except Exception as e:
+        return {"found": False, "name": None, "lat": req.lat, "lon": req.lon}

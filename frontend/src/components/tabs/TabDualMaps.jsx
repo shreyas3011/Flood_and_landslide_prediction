@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Layers, Droplets, Mountain, MapPin } from 'lucide-react';
 import axios from 'axios';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import { getRiskColor, getRiskLabel } from '../../utils/riskUtils';
 
-const API_BASE = 'https://flood-and-landslide-prediction.onrender.com';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://flood-and-landslide-prediction.onrender.com';
 
 async function fetchPrediction(lat, lon) {
   const response = await axios.post(`${API_BASE}/predict`, { lat, lon });
@@ -76,6 +78,40 @@ function ClickCaptureLayer({ onMapClick }) {
   return null;
 }
 
+function MapSizeFixer() {
+  const map = useMap();
+  useEffect(() => {
+    map.invalidateSize();
+    const t1 = setTimeout(() => map.invalidateSize(), 100);
+    const t2 = setTimeout(() => map.invalidateSize(), 400);
+    const t3 = setTimeout(() => map.invalidateSize(), 800);
+    const handleResize = () => map.invalidateSize();
+    window.addEventListener('resize', handleResize);
+
+    const container = map.getContainer();
+    let observer;
+    if (container && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 50);
+      });
+      observer.observe(container);
+    }
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener('resize', handleResize);
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [map]);
+  return null;
+}
+
 export default function TabDualMaps() {
   const [gridData, setGridData] = useState([]);
   const [clickPoints, setClickPoints] = useState([]);
@@ -142,7 +178,7 @@ export default function TabDualMaps() {
   const lsVisible = allPts.filter(pt => pt.prediction.predictions.landslide_risk_pct >= LANDSLIDE_THRESHOLD);
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-4 flex-1 h-full min-h-[500px]">
       {/* Controls */}
       <div className="glass p-4 rounded-2xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg shrink-0">
         <div className="flex items-center gap-4">
@@ -179,7 +215,7 @@ export default function TabDualMaps() {
       )}
 
       {!fetched && !loadingAll && (
-        <div className="glass flex-1 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center opacity-60">
+        <div className="glass flex-1 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center opacity-60 min-h-[400px]">
           <Layers size={48} className="text-slate-500 mb-4" />
           <h3 className="text-lg font-bold text-slate-300 mb-2">Maps Uninitialized</h3>
           <p className="text-sm text-slate-500 max-w-md">
@@ -190,7 +226,7 @@ export default function TabDualMaps() {
       )}
 
       {loadingAll && (
-        <div className="glass flex-1 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center">
+        <div className="glass flex-1 rounded-2xl border border-white/5 flex flex-col items-center justify-center text-center min-h-[400px]">
           <div className="w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin mb-4" />
           <h3 className="text-lg font-bold text-blue-400 mb-1">Scanning Subcontinent... {progress}%</h3>
           <p className="text-xs text-slate-400">Processing batch {Math.round(progress * ALL_RISK_POINTS.length / 100)} of {ALL_RISK_POINTS.length}</p>
@@ -199,15 +235,16 @@ export default function TabDualMaps() {
 
       {/* Dual Maps Grid */}
       {(fetched || clickPoints.length > 0) && !loadingAll && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[450px]">
           {/* Flood Map */}
-          <div className="relative glass-card-blue rounded-[2rem] border border-blue-500/20 overflow-hidden shadow-[0_10px_40px_rgba(59,130,246,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(59,130,246,0.25)] h-[350px] lg:h-full">
+          <div className="relative glass-card-blue rounded-[2rem] border border-blue-500/20 overflow-hidden shadow-[0_10px_40px_rgba(59,130,246,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(59,130,246,0.25)] w-full h-[350px] lg:h-[calc(100vh-220px)] lg:min-h-[450px] lg:max-h-[750px]">
             <MapContainer center={[22, 82]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
               <TileLayer
                 attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
               />
               <ClickCaptureLayer onMapClick={handleMapClick} />
+              <MapSizeFixer />
               {floodVisible.map((pt, i) => (
                 <CircleMarker
                   key={`flood-${pt.id ?? i}`}
@@ -244,13 +281,14 @@ export default function TabDualMaps() {
           </div>
 
           {/* Landslide Map */}
-          <div className="relative glass-card-amber rounded-[2rem] border border-amber-500/20 overflow-hidden shadow-[0_10px_40px_rgba(245,158,11,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(245,158,11,0.25)] h-[350px] lg:h-full">
+          <div className="relative glass-card-amber rounded-[2rem] border border-amber-500/20 overflow-hidden shadow-[0_10px_40px_rgba(245,158,11,0.15)] group transition-all duration-500 hover:shadow-[0_10px_50px_rgba(245,158,11,0.25)] w-full h-[350px] lg:h-[calc(100vh-220px)] lg:min-h-[450px] lg:max-h-[750px]">
             <MapContainer center={[22, 82]} zoom={5} style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}>
               <TileLayer
                 attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
                 url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
               />
               <ClickCaptureLayer onMapClick={handleMapClick} />
+              <MapSizeFixer />
               {lsVisible.map((pt, i) => (
                 <CircleMarker
                   key={`ls-${pt.id ?? i}`}

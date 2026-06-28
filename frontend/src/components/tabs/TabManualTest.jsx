@@ -3,7 +3,9 @@ import { Droplets, Mountain } from 'lucide-react';
 import axios from 'axios';
 import { getRiskColor, getRiskLabel, getRiskIcon, getRiskAdvice } from '../../utils/riskUtils';
 
-const API_BASE = 'https://flood-and-landslide-prediction.onrender.com';
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:8000'
+  : 'https://flood-and-landslide-prediction.onrender.com';
 
 // ── TAB 4: Manual Parameter Test (Separate Flood & Landslide) ─
 

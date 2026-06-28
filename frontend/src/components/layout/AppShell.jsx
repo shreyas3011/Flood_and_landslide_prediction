@@ -23,7 +23,7 @@ export default function AppShell({ activeTab, setActiveTab, children }) {
       {/* Desktop: fixed full-height; Mobile: scrollable with bottom padding for fixed nav */}
       <main className="relative z-10 w-full max-w-[1600px] mx-auto px-3 sm:px-4 md:px-6 py-3 md:py-4
         md:h-[calc(100vh-64px)] md:overflow-hidden
-        flex-1 overflow-y-auto
+        flex-1 flex flex-col overflow-y-auto
         pb-20 md:pb-4">
         {children}
       </main>

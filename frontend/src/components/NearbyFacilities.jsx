@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents,
+  MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, useMapEvents, Polyline,
 } from 'react-leaflet';
 import L from 'leaflet';
+import { getRoute } from '../services/orsService';
 
 // ── Leaflet icon fix ──────────────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -152,6 +153,40 @@ function MapFlyTo({ position, zoom = 13 }) {
   return null;
 }
 
+function MapSizeFixer() {
+  const map = useMap();
+  useEffect(() => {
+    map.invalidateSize();
+    const t1 = setTimeout(() => map.invalidateSize(), 100);
+    const t2 = setTimeout(() => map.invalidateSize(), 400);
+    const t3 = setTimeout(() => map.invalidateSize(), 800);
+    const handleResize = () => map.invalidateSize();
+    window.addEventListener('resize', handleResize);
+
+    const container = map.getContainer();
+    let observer;
+    if (container && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 50);
+      });
+      observer.observe(container);
+    }
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener('resize', handleResize);
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [map]);
+  return null;
+}
+
 function makePin(color, emoji, pulse = false) {
   return L.divIcon({
     className: '',
@@ -230,6 +265,9 @@ export default function NearbyFacilities() {
   const [isTyping,          setIsTyping]          = useState(false);
   const suggestionsRef = useRef(null);
 
+  const [evacRoutes, setEvacRoutes] = useState([]);
+  const [routesLoading, setRoutesLoading] = useState(false);
+
   // ── Toggle facility type filter ───────────────────────────────
   const toggleType = useCallback((key) => {
     setActiveTypes(prev => {
@@ -252,6 +290,7 @@ export default function NearbyFacilities() {
     setSelected(null);
     setStatus('loading');
     setLocError('');
+    setEvacRoutes([]);
     try {
       const elements = await queryOverpass(lat, lon, radiusKm * 1000, activeTypes);
       const mapped = elements
@@ -273,6 +312,44 @@ export default function NearbyFacilities() {
 
       setResults(mapped);
       setStatus('done');
+
+      // Calculate evacuation routes to nearest hospital and police station
+      setRoutesLoading(true);
+      try {
+        const nearestHosp = mapped.find(r => r.type === 'hospital') || mapped.find(r => r.type === 'clinic');
+        const nearestPolice = mapped.find(r => r.type === 'police') || mapped.find(r => r.type === 'fire_station');
+        
+        const routePromises = [];
+        if (nearestHosp) {
+          routePromises.push(
+            getRoute(lat, lon, nearestHosp.lat, nearestHosp.lon).then(route => ({
+              type: 'hospital',
+              title: nearestHosp.type === 'hospital' ? 'Nearest Hospital' : 'Nearest Clinic',
+              facility: nearestHosp,
+              route,
+              color: '#10b981'
+            }))
+          );
+        }
+        if (nearestPolice) {
+          routePromises.push(
+            getRoute(lat, lon, nearestPolice.lat, nearestPolice.lon).then(route => ({
+              type: 'police',
+              title: nearestPolice.type === 'police' ? 'Nearest Police Station' : 'Nearest Emergency Service',
+              facility: nearestPolice,
+              route,
+              color: '#3b82f6'
+            }))
+          );
+        }
+        
+        const routesData = await Promise.all(routePromises);
+        setEvacRoutes(routesData);
+      } catch (e) {
+        console.error('Failed to calculate routes:', e);
+      } finally {
+        setRoutesLoading(false);
+      }
     } catch (err) {
       setErrorMsg(err.message || 'Search failed.');
       setStatus('error');
@@ -424,14 +501,14 @@ export default function NearbyFacilities() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: '14px', fontFamily: "'Inter', sans-serif", minHeight: 0 }}>
+    <div style={{ display: 'flex', height: '100%', flex: 1, width: '100%', gap: '14px', fontFamily: "'Inter', sans-serif", minHeight: '500px' }}>
 
       {/* ══ LEFT: Map ══ */}
       <div style={{
         flex: 1, borderRadius: '16px', overflow: 'hidden',
         border: `1px solid ${C.border}`,
         boxShadow: `0 0 0 1px ${C.accentGlow}, 0 8px 32px rgba(0,0,0,0.5)`,
-        position: 'relative', minHeight: 0,
+        position: 'relative', minHeight: '400px', width: '100%',
       }}>
         {/* Map hint */}
         <div style={{
@@ -446,13 +523,14 @@ export default function NearbyFacilities() {
 
         <MapContainer
           center={[22.5, 82.5]} zoom={5}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', position: 'absolute', inset: 0 }}
         >
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
           {flyTarget && <MapFlyTo position={flyTarget} zoom={radiusKm <= 5 ? 14 : radiusKm <= 15 ? 13 : 11} />}
+          <MapSizeFixer />
 
           {/* User pin */}
           {userPos && (
@@ -465,6 +543,29 @@ export default function NearbyFacilities() {
               </Popup>
             </Marker>
           )}
+
+          {/* Evacuation Polylines */}
+          {evacRoutes.map((er, idx) => (
+            <Polyline
+              key={`route-${er.type}-${idx}`}
+              positions={er.route.coords}
+              pathOptions={{
+                color: er.color,
+                weight: 6,
+                opacity: 0.85,
+                dashArray: er.route.isFallback ? '10, 10' : undefined
+              }}
+            >
+              <Tooltip sticky>
+                <div style={{ fontFamily: 'Inter,sans-serif', fontSize: '12px' }}>
+                  <strong>{er.title}: {er.facility.name}</strong><br />
+                  <span>Distance: {fmtKm(er.route.distanceM / 1000)}</span><br />
+                  {er.route.durationSec ? <span>Time: {Math.ceil(er.route.durationSec / 60)} mins drive</span> : null}
+                  {er.route.isFallback ? <span style={{ color: '#f59e0b' }}> (Direct line-of-sight path)</span> : null}
+                </div>
+              </Tooltip>
+            </Polyline>
+          ))}
 
           {/* Facility markers */}
           {results.map((r, idx) => {
@@ -757,6 +858,62 @@ export default function NearbyFacilities() {
                 {userPos?.lat.toFixed(4)}°N, {userPos?.lon.toFixed(4)}°E · {radiusKm} km radius
               </div>
             </div>
+
+            {/* Evacuation Routes Summary Card */}
+            {routesLoading ? (
+              <div style={{ ...card, padding: '14px', textAlign: 'center' }} className="nf-card">
+                <div className="nf-spinner" style={{ margin: '0 auto 12px', width: 24, height: 24 }} />
+                <div style={{ fontSize: '12px', fontWeight: 700, color: C.text }}>Calculating Evacuation Routes...</div>
+                <div style={{ fontSize: '10px', color: C.textMuted }}>Finding safest path to nearest Hospital & Police station</div>
+              </div>
+            ) : evacRoutes.length > 0 ? (
+              <div style={{ ...card, padding: '14px', background: 'linear-gradient(135deg, #1e293b, #0f172a)', border: '1px solid rgba(16, 185, 129, 0.3)' }} className="nf-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '22px' }}>🚨</span>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#10b981' }}>Evacuation Navigation</div>
+                    <div style={{ fontSize: '10px', color: C.textMuted }}>Safest emergency routes plotted on map</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {evacRoutes.map((er, idx) => (
+                    <div
+                      key={`evac-card-${idx}`}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${er.color}44`,
+                        borderLeft: `4px solid ${er.color}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                      onClick={() => {
+                        setSelected(er.facility.id);
+                        setFlyTarget({ lat: er.facility.lat, lon: er.facility.lon });
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: er.color }}>
+                          {er.facility.typeMeta.emoji} {er.title}
+                        </span>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: '#e2e8f0', background: `${er.color}22`, padding: '2px 8px', borderRadius: '12px' }}>
+                          {er.route.durationSec ? `${Math.ceil(er.route.durationSec / 60)} mins` : 'Direct'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: C.text, marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {er.facility.name}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', color: C.textMuted }}>
+                        <span>📏 {fmtKm(er.route.distanceM / 1000)} away {er.route.isFallback ? '(Direct)' : '(Drive)'}</span>
+                        <span style={{ color: er.color, fontWeight: 600 }}>🔍 Focus Map</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {/* Results list */}
             <div style={{ ...card, padding: 0, overflow: 'hidden' }} className="nf-card">
