@@ -386,6 +386,8 @@ class SatelliteRequest(BaseModel):
     lon: float
     image_type: str = "true_color"  # true_color | ndwi | ndvi
     size_km: float = 8.0
+    mosaicking_order: str = "mostRecent"  # mostRecent | leastCC
+    days: int = 15
 
 @app.post("/satellite/image")
 def get_satellite_image(req: SatelliteRequest):
@@ -412,7 +414,7 @@ def get_satellite_image(req: SatelliteRequest):
         ]
 
         end_date   = datetime.utcnow()
-        start_date = end_date - timedelta(days=90)
+        start_date = end_date - timedelta(days=req.days)
 
         payload = {
             "input": {
@@ -426,7 +428,7 @@ def get_satellite_image(req: SatelliteRequest):
                             "from": start_date.strftime("%Y-%m-%dT00:00:00Z"),
                             "to":   end_date.strftime("%Y-%m-%dT23:59:59Z"),
                         },
-                        "mosaickingOrder": "leastCC",
+                        "mosaickingOrder": req.mosaicking_order,
                     },
                     "type": "sentinel-2-l2a",
                 }],
@@ -458,8 +460,13 @@ def get_satellite_image(req: SatelliteRequest):
             if catalog_resp.status_code == 200:
                 features = catalog_resp.json().get("features", [])
                 if features:
-                    # Sort by cloud cover ascending (matches leastCC mosaicking)
-                    features.sort(key=lambda x: x.get("properties", {}).get("eo:cloud_cover", 100))
+                    if req.mosaicking_order == "mostRecent":
+                        # Sort by date descending (most recent first)
+                        features.sort(key=lambda x: x.get("properties", {}).get("datetime", ""), reverse=True)
+                    else:
+                        # Sort by cloud cover ascending (matches leastCC mosaicking)
+                        features.sort(key=lambda x: x.get("properties", {}).get("eo:cloud_cover", 100))
+                    
                     best_feat = features[0]
                     img_date = best_feat.get("properties", {}).get("datetime")
                     cloud_cover = best_feat.get("properties", {}).get("eo:cloud_cover")
@@ -474,9 +481,16 @@ def get_satellite_image(req: SatelliteRequest):
         )
 
         if img_resp.status_code != 200:
+            err_msg = img_resp.text[:500]
+            # Custom message for empty timeRange matches on Sentinel Hub Process API
+            if "No data found" in err_msg or img_resp.status_code == 400:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No recent satellite images found in the last {req.days} days for this location. Try choosing the 'Clearest image' mode to check older images."
+                )
             raise HTTPException(
                 status_code=img_resp.status_code,
-                detail=f"Sentinel Hub Process API error: {img_resp.text[:500]}",
+                detail=f"Sentinel Hub Process API error: {err_msg}",
             )
 
         encoded = base64.b64encode(img_resp.content).decode("utf-8")

@@ -42,7 +42,7 @@ const IMAGE_CONFIGS = [
   },
 ];
 
-function SingleImageCard({ config, lat, lon, riverInfo, onExpand }) {
+function SingleImageCard({ config, lat, lon, riverInfo, onExpand, mosaickingOrder, days }) {
   const [imageData, setImageData] = useState(null);
   const [imageMeta, setImageMeta] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -66,6 +66,8 @@ function SingleImageCard({ config, lat, lon, riverInfo, onExpand }) {
         lon: targetLon,
         image_type: config.type,
         size_km: sizeKm,
+        mosaicking_order: mosaickingOrder,
+        days: days
       }, { timeout: 50000 });
 
       setImageData(res.data.image_base64);
@@ -78,12 +80,12 @@ function SingleImageCard({ config, lat, lon, riverInfo, onExpand }) {
     } finally {
       setLoading(false);
     }
-  }, [lat, lon, config.type, riverInfo]);
+  }, [lat, lon, config.type, riverInfo, mosaickingOrder, days]);
 
-  // Auto-fetch when coordinates change
+  // Auto-fetch when coordinates or settings change
   useEffect(() => {
     fetchImage();
-  }, [coordsKey, fetchImage]);
+  }, [coordsKey, mosaickingOrder, days, fetchImage]);
 
   return (
     <div className={`flex flex-col rounded-2xl border ${config.borderColor} bg-slate-900/60 backdrop-blur-sm overflow-hidden shadow-lg ${config.glowColor} transition-all duration-300`}>
@@ -159,8 +161,19 @@ function SingleImageCard({ config, lat, lon, riverInfo, onExpand }) {
             </div>
             {/* Corner badge for river */}
             {config.type === 'true_color' && riverInfo?.found && (
-              <div className="absolute top-2 left-2 bg-blue-900/80 backdrop-blur text-blue-300 text-[10px] px-2 py-0.5 rounded-md font-semibold flex items-center gap-1">
+              <div className="absolute top-2 left-2 bg-blue-900/80 backdrop-blur text-blue-300 text-[10px] px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 shadow-md">
                 <MapPin size={10} /> {riverInfo.name}
+              </div>
+            )}
+            {/* Corner badge for date & cloud cover */}
+            {imageMeta?.date && (
+              <div className="absolute top-2 right-2 bg-slate-900/85 backdrop-blur text-slate-200 text-[10px] px-2 py-0.5 rounded-md font-semibold flex flex-col items-end shadow-md">
+                <span>📅 {imageMeta.date.split('T')[0]}</span>
+                {imageMeta.cloudCover !== null && (
+                  <span className="text-[8px] text-slate-400 leading-tight">
+                    ☁️ {Math.round(imageMeta.cloudCover)}% clouds
+                  </span>
+                )}
               </div>
             )}
           </>
@@ -219,6 +232,7 @@ export default function SatelliteImageViewer({ lat, lon, locationName }) {
   const [riverLoading, setRiverLoading] = useState(false);
   const [expandedConfig, setExpandedConfig] = useState(null);
   const [expandedImage, setExpandedImage] = useState(null);
+  const [imageMode, setImageMode] = useState('mostRecent'); // 'mostRecent' | 'leastCC'
 
   const coordsKey = `${lat?.toFixed(4)}-${lon?.toFixed(4)}`;
 
@@ -239,7 +253,7 @@ export default function SatelliteImageViewer({ lat, lon, locationName }) {
     <>
       <div className="mt-2">
         {/* Section Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center">
               <Satellite size={18} className="text-indigo-400" />
@@ -247,23 +261,42 @@ export default function SatelliteImageViewer({ lat, lon, locationName }) {
             <div>
               <h3 className="text-sm font-bold text-slate-200">Live Satellite Analysis</h3>
               <p className="text-[10px] text-slate-500">
-                Sentinel-2 ESA · Most recent clear image (last 90 days)
+                Sentinel-2 ESA · {imageMode === 'mostRecent' ? 'Most recent (last 15 days)' : 'Clearest (last 90 days)'}
               </p>
             </div>
           </div>
-          {/* River info badge */}
-          {riverLoading ? (
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-              <div className="w-3 h-3 rounded-full border border-slate-500 border-t-transparent animate-spin" />
-              Finding river...
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Image preference selector */}
+            <div className="flex bg-slate-950/60 p-1 rounded-xl border border-white/5 gap-1 shadow-inner">
+              <button
+                className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-200 ${imageMode === 'mostRecent' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                onClick={() => setImageMode('mostRecent')}
+              >
+                📅 Most recent
+              </button>
+              <button
+                className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-200 ${imageMode === 'leastCC' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                onClick={() => setImageMode('leastCC')}
+              >
+                ✨ Clearest (older)
+              </button>
             </div>
-          ) : riverInfo?.found ? (
-            <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px] px-3 py-1 rounded-full">
-              <MapPin size={10} /> {riverInfo.name}
-            </div>
-          ) : (
-            <div className="text-[10px] text-slate-600 italic">No river found nearby</div>
-          )}
+
+            {/* River info badge */}
+            {riverLoading ? (
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                <div className="w-3 h-3 rounded-full border border-slate-500 border-t-transparent animate-spin" />
+                Finding river...
+              </div>
+            ) : riverInfo?.found ? (
+              <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[10px] px-3 py-1.5 rounded-full shrink-0">
+                <MapPin size={10} /> {riverInfo.name}
+              </div>
+            ) : (
+              <div className="text-[10px] text-slate-600 italic shrink-0">No river found nearby</div>
+            )}
+          </div>
         </div>
 
         {/* Location context bar */}
@@ -284,6 +317,8 @@ export default function SatelliteImageViewer({ lat, lon, locationName }) {
               lon={lon}
               riverInfo={config.type === 'true_color' ? riverInfo : null}
               onExpand={(imgData, cfg) => { setExpandedImage(imgData); setExpandedConfig(cfg); }}
+              mosaickingOrder={imageMode}
+              days={imageMode === 'mostRecent' ? 15 : 90}
             />
           ))}
         </div>
