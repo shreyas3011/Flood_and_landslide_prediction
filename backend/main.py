@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from typing import Optional
 import requests
 from backend.predictor import predict_risk, engineer_flood_features, engineer_landslide_features, \
-    flood_model, landslide_model, _physics_flood_cap, _physics_landslide_cap, flood_meta, landslide_meta
+    flood_model, landslide_model, _physics_flood_cap, _physics_landslide_cap, flood_meta, landslide_meta, \
+    apply_flood_overrides, apply_landslide_overrides
 
 app = FastAPI(
     title="Flood & Landslide Prediction API",
@@ -103,15 +104,9 @@ def predict_manual(req: ManualRequest):
         flood_prob = min(flood_ml, max_flood)
         ls_prob    = min(ls_ml,    max_ls)
 
-        total_water = rain + antecedent * 0.5 + discharge * 0.01
-        if total_water < 3.0:
-            flood_prob = min(flood_prob, 0.08)
-            ls_prob    = min(ls_prob,    0.06)
-        if elev < 80:
-            ls_prob = min(ls_prob, 0.04)
-        if rain == 0 and antecedent < 2 and humidity < 20:
-            flood_prob = min(flood_prob, 0.02)
-            ls_prob    = min(ls_prob,    0.02)
+        # Apply physical hard overrides
+        flood_prob = apply_flood_overrides(flood_prob, rain, antecedent, discharge, elev, humidity)
+        ls_prob    = apply_landslide_overrides(ls_prob, rain, antecedent, elev, humidity)
 
         return {
             "raw_ml_probabilities": {
@@ -199,11 +194,8 @@ def predict_flood_manual(req: FloodManualRequest):
         max_flood  = _physics_flood_cap(rain, antecedent, discharge, elev)
         flood_prob = min(flood_ml, max_flood)
 
-        total_water = rain + antecedent * 0.5 + discharge * 0.01
-        if total_water < 3.0:
-            flood_prob = min(flood_prob, 0.08)
-        if rain == 0 and antecedent < 2 and humidity < 20:
-            flood_prob = min(flood_prob, 0.02)
+        # Apply physical hard overrides
+        flood_prob = apply_flood_overrides(flood_prob, rain, antecedent, discharge, elev, humidity)
 
         return {
             "raw_ml_probability": round(flood_ml * 100, 1),
@@ -289,13 +281,8 @@ def predict_landslide_manual(req: LandslideManualRequest):
         max_ls  = _physics_landslide_cap(rain, antecedent, elev, soil_moist)
         ls_prob = min(ls_ml, max_ls)
 
-        total_water = rain + antecedent * 0.5 + discharge * 0.01
-        if total_water < 3.0:
-            ls_prob = min(ls_prob, 0.06)
-        if elev < 80:
-            ls_prob = min(ls_prob, 0.04)
-        if rain == 0 and antecedent < 2 and humidity < 20:
-            ls_prob = min(ls_prob, 0.02)
+        # Apply physical hard overrides
+        ls_prob = apply_landslide_overrides(ls_prob, rain, antecedent, elev, humidity)
 
         return {
             "raw_ml_probability":  round(ls_ml * 100, 1),

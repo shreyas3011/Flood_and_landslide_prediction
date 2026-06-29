@@ -219,20 +219,24 @@ def _physics_flood_cap(rain, antecedent, discharge, elev):
     Humidity alone CANNOT cause flooding.
     """
     # Each component scaled 0-1
-    rain_score = min(1.0, rain / 75.0)            # 75mm = heavy rain
-    ante_score = min(1.0, antecedent / 80.0)       # 80mm over 7 days = saturated
-    disc_score = min(1.0, discharge / 2000.0)      # 2000 m³/s = flood-level
+    rain_score = min(1.0, rain / 85.0)            # 85mm = heavy rain
+    ante_score = min(1.0, antecedent / 150.0)     # 150mm over 7 days = saturated soil
+    disc_score = min(1.0, discharge / 2000.0)     # 2000 m³/s = flood-level
 
-    # Overall water signal: heavy daily rain alone can cause flash flooding,
-    # or high river discharge/antecedent accumulation can cause riverine flooding.
-    water_signal = max(rain_score, 0.50 * rain_score + 0.30 * ante_score + 0.20 * disc_score)
+    # Hydrological water signal: daily rain and river discharge are primary drivers
+    base_signal = max(rain_score, disc_score)
+    # Antecedent soil moisture amplifies the runoff coefficient
+    water_signal = base_signal * (0.5 + 0.5 * ante_score)
 
-    # Highland penalty (water runs off fast, doesn't accumulate)
-    if   elev > 1500: water_signal *= 0.45
-    elif elev > 800:  water_signal *= 0.70
+    # Highland penalty (water drains and runs off fast at higher elevations)
+    if   elev > 1500: water_signal *= 0.35
+    elif elev > 800:  water_signal *= 0.55
+    elif elev > 500:  water_signal *= 0.70   # e.g., Pune/Balewadi (~575m)
+    elif elev > 300:  water_signal *= 0.80
+    elif elev > 150:  water_signal *= 0.90
 
-    # Max flood prob: 8% baseline → 95% at extreme water signal
-    return min(0.97, 0.08 + 0.87 * water_signal)
+    # Max flood prob: 8% baseline → 97% at extreme water signal
+    return min(0.97, 0.08 + 0.89 * water_signal)
 
 
 def _physics_landslide_cap(rain, antecedent, elev, soil_moisture):
@@ -242,11 +246,11 @@ def _physics_landslide_cap(rain, antecedent, elev, soil_moisture):
     All three must be present — flat terrain = zero, no rain = near zero.
     """
     # Slope proxy: below 80m = flat, above 350m = potentially very steep.
-    # Uses logarithmic scaling consistent with engineered slope features.
     if elev < 80:
         slope_score = 0.0
     else:
-        slope_score = min(1.0, np.log1p(elev - 80) / np.log1p(350 - 80))
+        # Linear scaling is more robust than log for slope-proxy elevation gating
+        slope_score = min(1.0, (elev - 80) / (350 - 80))
 
     # Rain score
     rain_score = min(1.0, rain / 80.0)
@@ -261,6 +265,45 @@ def _physics_landslide_cap(rain, antecedent, elev, soil_moisture):
 
     return min(0.95, 0.04 + 0.91 * ls_signal)
 
+
+def apply_flood_overrides(prob: float, rain: float, antecedent: float, discharge: float, elev: float, humidity: float) -> float:
+    """Apply physical hard overrides to restrict flood probability under impossible conditions."""
+    # Low total water override
+    total_water = rain + antecedent * 0.5 + discharge * 0.01
+    if total_water < 3.0:
+        prob = min(prob, 0.08)
+
+    # Volumetric gating for light rain, low river discharge, and low antecedent accumulation
+    if rain < 25.0 and antecedent < 80.0 and discharge < 150.0:
+        prob = min(prob, 0.12)  # Cap at 12% (Very Low Risk)
+
+    # Dry weather override
+    if rain == 0 and antecedent < 2 and humidity < 20:
+        prob = min(prob, 0.02)
+
+    return prob
+
+
+def apply_landslide_overrides(prob: float, rain: float, antecedent: float, elev: float, humidity: float) -> float:
+    """Apply physical hard overrides to restrict landslide probability under impossible conditions."""
+    # Low total water override
+    total_water = rain + antecedent * 0.5
+    if total_water < 3.0:
+        prob = min(prob, 0.06)
+
+    # Gating for light rain and low antecedent accumulation
+    if rain < 35.0 and antecedent < 100.0:
+        prob = min(prob, 0.10)  # Cap at 10% (Very Low Risk)
+
+    # Elevation gating (truly flat areas)
+    if elev < 80:
+        prob = min(prob, 0.04)
+
+    # Dry weather override
+    if rain == 0 and antecedent < 2 and humidity < 20:
+        prob = min(prob, 0.02)
+
+    return prob
 
 
 # ── Main prediction ───────────────────────────────────────────
@@ -294,18 +337,9 @@ def predict_risk(lat: float, lon: float):
     flood_prob = min(flood_ml, max_flood)
     ls_prob    = min(ls_ml,    max_ls)
 
-    # Hard overrides for clearly impossible conditions
-    total_water = rain + antecedent * 0.5 + discharge * 0.01
-    if total_water < 3.0:
-        flood_prob = min(flood_prob, 0.08)
-        ls_prob    = min(ls_prob,    0.06)
-
-    if elev < 80:
-        ls_prob = min(ls_prob, 0.04)   # truly flat — no landslide
-
-    if rain == 0 and antecedent < 2 and humidity < 20:
-        flood_prob = min(flood_prob, 0.02)
-        ls_prob    = min(ls_prob,    0.02)
+    # Apply physical hard overrides
+    flood_prob = apply_flood_overrides(flood_prob, rain, antecedent, discharge, elev, humidity)
+    ls_prob    = apply_landslide_overrides(ls_prob, rain, antecedent, elev, humidity)
 
     # ── Explainable AI (XAI) Heuristics ──
     def get_flood_xai(r, a, d, e, prob):
