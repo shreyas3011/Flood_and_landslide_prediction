@@ -253,7 +253,7 @@ export default function TabDualMaps() {
                       <strong className="block text-sm mb-1 text-slate-800 dark:text-slate-800 dark:text-slate-200">{pt.label}</strong>
                       <div className="flex justify-between items-center bg-blue-500/10 p-1.5 rounded text-blue-600 dark:text-blue-400 mb-1">
                         <span className="font-semibold flex items-center gap-1"><Droplets size={12}/> Flood</span>
-                        <span className="font-bold text-sm">{pt.prediction.predictions.flood_risk_pct}%</span>
+                        <span className="font-bold text-sm">{getRiskLabel(pt.prediction.predictions.flood_risk_pct)}</span>
                       </div>
                       <span className="text-[10px] text-slate-500">{getRiskLabel(pt.prediction.predictions.flood_risk_pct)}</span>
                     </div>
@@ -300,7 +300,7 @@ export default function TabDualMaps() {
                       <strong className="block text-sm mb-1 text-slate-800 dark:text-slate-800 dark:text-slate-200">{pt.label}</strong>
                       <div className="flex justify-between items-center bg-amber-500/10 p-1.5 rounded text-amber-600 dark:text-amber-500 mb-1">
                         <span className="font-semibold flex items-center gap-1"><Mountain size={12}/> Landslide</span>
-                        <span className="font-bold text-sm">{pt.prediction.predictions.landslide_risk_pct}%</span>
+                        <span className="font-bold text-sm">{getRiskLabel(pt.prediction.predictions.landslide_risk_pct)}</span>
                       </div>
                       <span className="text-[10px] text-slate-500">{getRiskLabel(pt.prediction.predictions.landslide_risk_pct)}</span>
                     </div>
@@ -329,11 +329,11 @@ export default function TabDualMaps() {
           <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <Droplets size={14} className="text-blue-500 dark:text-blue-400" />
-              <span className="text-xs font-semibold text-blue-600 dark:text-blue-300">{t('floodRiskLabel')}: <span className="font-bold text-blue-600 dark:text-blue-400">{lastClick.prediction.predictions.flood_risk_pct}%</span></span>
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-300">{t('floodRiskLabel')}: <span className="font-bold text-blue-600 dark:text-blue-400">{getRiskLabel(lastClick.prediction.predictions.flood_risk_pct)}</span></span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <Mountain size={14} className="text-amber-600 dark:text-amber-500" />
-              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{t('landslideRiskLabel')}: <span className="font-bold text-amber-600 dark:text-amber-500">{lastClick.prediction.predictions.landslide_risk_pct}%</span></span>
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{t('landslideRiskLabel')}: <span className="font-bold text-amber-600 dark:text-amber-500">{getRiskLabel(lastClick.prediction.predictions.landslide_risk_pct)}</span></span>
             </div>
           </div>
         </div>

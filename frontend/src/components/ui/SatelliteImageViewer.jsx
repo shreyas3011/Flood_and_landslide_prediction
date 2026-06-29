@@ -229,7 +229,7 @@ export default function SatelliteImageViewer({ lat, lon, locationName }) {
   const [riverLoading, setRiverLoading] = useState(false);
   const [expandedConfig, setExpandedConfig] = useState(null);
   const [expandedImage, setExpandedImage] = useState(null);
-  const [imageMode, setImageMode] = useState('mostRecent'); // 'mostRecent' | 'leastCC'
+  const [imageMode, setImageMode] = useState('leastCC'); // Always 'leastCC' (Clearest older)
 
   const coordsKey = `${lat?.toFixed(4)}-${lon?.toFixed(4)}`;
 
@@ -264,20 +264,9 @@ export default function SatelliteImageViewer({ lat, lon, locationName }) {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Image preference selector */}
-            <div className="flex bg-slate-950/60 p-1 rounded-xl border border-white/5 gap-1 shadow-inner">
-              <button
-                className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-200 ${imageMode === 'mostRecent' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-                onClick={() => setImageMode('mostRecent')}
-              >
-                📅 Most recent
-              </button>
-              <button
-                className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-200 ${imageMode === 'leastCC' ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-                onClick={() => setImageMode('leastCC')}
-              >
-                ✨ Clearest (older)
-              </button>
+            {/* Image preference badge */}
+            <div className="bg-slate-950/60 px-3 py-1.5 rounded-xl border border-white/5 shadow-inner text-[10px] font-bold text-indigo-300 flex items-center gap-1 select-none">
+              <span>✨</span> Clearest (older)
             </div>
 
             {/* River info badge */}

@@ -23,7 +23,7 @@ export default function PredictionResult({ prediction }) {
               <div className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('floodRiskLabel')}</div>
             </div>
             <div className={`text-2xl font-extrabold tracking-tight ${getRiskTextClass(fp)}`}>
-              {fp}%
+              {getRiskLabel(fp)}
             </div>
           </div>
           <div className="w-full h-1 bg-slate-800/50 rounded-full mb-2 overflow-hidden">
@@ -51,7 +51,7 @@ export default function PredictionResult({ prediction }) {
               <div className="text-sm font-bold text-slate-800 dark:text-slate-200">{t('landslideRiskLabel')}</div>
             </div>
             <div className={`text-2xl font-extrabold tracking-tight ${getRiskTextClass(lp)}`}>
-              {lp}%
+              {getRiskLabel(lp)}
             </div>
           </div>
           <div className="w-full h-1 bg-slate-800/50 rounded-full mb-2 overflow-hidden">
@@ -126,7 +126,7 @@ export default function PredictionResult({ prediction }) {
       )}
 
       {/* Evacuation Map for High Risk */}
-      {(fp > 70 || lp > 70) && (
+      {(fp > 50 || lp > 50) && (
         <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="flex items-center gap-3 mb-4 px-2">
             <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center animate-pulse-glow">

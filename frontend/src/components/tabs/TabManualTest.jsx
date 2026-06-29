@@ -260,7 +260,7 @@ function ManualResultBar({ label, mlPct, finalPct, capPct, color, icon }) {
       <div className="manual-result-header">
         {icon}
         <span className="manual-result-title">{label}</span>
-        <span className="manual-result-final" style={{ color }}>{finalPct}%</span>
+        <span className="manual-result-final" style={{ color }}>{getRiskLabel(finalPct)}</span>
       </div>
       <div className="manual-result-bars">
         <div className="manual-bar-row">
@@ -282,7 +282,7 @@ function ManualResultBar({ label, mlPct, finalPct, capPct, color, icon }) {
           <div className="risk-bar-track">
             <div className="risk-bar-fill" style={{ width: `${finalPct}%`, background: color }} />
           </div>
-          <span className="manual-bar-val" style={{ color, fontWeight: 700 }}>{finalPct}%</span>
+          <span className="manual-bar-val" style={{ color, fontWeight: 700 }}>{getRiskLabel(finalPct)}</span>
         </div>
       </div>
       <div className="risk-status-row" style={{ marginTop: '0.5rem' }}>
@@ -650,7 +650,7 @@ function FloodManualTest() {
             <div className="glass-card" style={{ marginBottom: '1rem' }}>
               <div className="manual-summary-title"><Droplets size={16} className="icon-blue" /> Flood Prediction Result</div>
               <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span className="manual-result-big" style={{ color: getRiskColor(result.flood_risk_pct) }}>{result.flood_risk_pct}%</span>
+                <span className="manual-result-big" style={{ color: getRiskColor(result.flood_risk_pct) }}>{getRiskLabel(result.flood_risk_pct)}</span>
                 <span className="pill" style={{ background: getRiskColor(result.flood_risk_pct) + '33', color: getRiskColor(result.flood_risk_pct), borderColor: getRiskColor(result.flood_risk_pct) + '66', fontSize: '15px', padding: '6px 14px' }}>
                   {getRiskLabel(result.flood_risk_pct)}
                 </span>
@@ -666,7 +666,7 @@ function FloodManualTest() {
               <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.7 }}>
                 <p>① <span style={{ color: '#60a5fa' }}>Raw ML ({result.raw_ml_probability}%)</span> — Random Forest Model evaluated directly on the 21 input features.</p>
                 <p>② <span style={{ color: '#a78bfa' }}>Physics Cap ({result.physics_cap}%)</span> — Calculated using rain, river discharge, and elevation.</p>
-                <p>③ <span style={{ color: '#e2e8f0' }}>Final Risk ({result.flood_risk_pct}%)</span> — Capped by physical feasibility: min(ML, Physics Cap).</p>
+                <p>③ <span style={{ color: '#e2e8f0' }}>Final Risk ({getRiskLabel(result.flood_risk_pct)})</span> — Capped by physical feasibility: min(ML, Physics Cap).</p>
               </div>
             </div>
           </>
@@ -959,7 +959,7 @@ function LandslideManualTest() {
             <div className="glass-card" style={{ marginBottom: '1rem' }}>
               <div className="manual-summary-title"><Mountain size={16} className="icon-amber" /> Landslide Prediction Result</div>
               <div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span className="manual-result-big" style={{ color: getRiskColor(result.landslide_risk_pct) }}>{result.landslide_risk_pct}%</span>
+                <span className="manual-result-big" style={{ color: getRiskColor(result.landslide_risk_pct) }}>{getRiskLabel(result.landslide_risk_pct)}</span>
                 <span className="pill" style={{ background: getRiskColor(result.landslide_risk_pct) + '33', color: getRiskColor(result.landslide_risk_pct), borderColor: getRiskColor(result.landslide_risk_pct) + '66', fontSize: '15px', padding: '6px 14px' }}>
                   {getRiskLabel(result.landslide_risk_pct)}
                 </span>
@@ -975,7 +975,7 @@ function LandslideManualTest() {
               <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.7 }}>
                 <p>① <span style={{ color: '#60a5fa' }}>Raw ML ({result.raw_ml_probability}%)</span> — Naive Bayes Model evaluated directly on the 24 input features.</p>
                 <p>② <span style={{ color: '#a78bfa' }}>Physics Cap ({result.physics_cap}%)</span> — Calculated using rain, slope (elevation), and soil moisture.</p>
-                <p>③ <span style={{ color: '#e2e8f0' }}>Final Risk ({result.landslide_risk_pct}%)</span> — Capped by physical feasibility: min(ML, Physics Cap).</p>
+                <p>③ <span style={{ color: '#e2e8f0' }}>Final Risk ({getRiskLabel(result.landslide_risk_pct)})</span> — Capped by physical feasibility: min(ML, Physics Cap).</p>
               </div>
             </div>
           </>
